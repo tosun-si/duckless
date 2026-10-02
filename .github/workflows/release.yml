@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+env:
+  AR_LOCATION: europe
+  AR_PROJECT: duckless-public
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: version
+        name: Tag must match both package versions (bumped by the release-prep PR)
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for file in pyproject.toml runtime/pyproject.toml; do
+            declared=$(grep -m1 '^version = ' "$file" | cut -d'"' -f2)
+            if [ "$declared" != "$version" ]; then
+              echo "::error file=$file::version $declared does not match tag $GITHUB_REF_NAME"
+              exit 1
+            fi
+          done
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  runner-image:
+    needs: check-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_CI_SA }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - run: gcloud auth configure-docker ${{ env.AR_LOCATION }}-docker.pkg.dev --quiet
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/bake-action@v7
+        with:
+          source: .
+          files: docker-bake.hcl
+          push: true
+        env:
+          REGISTRY: ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.AR_PROJECT }}/duckless
+          CACHE_REGISTRY: ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.AR_PROJECT }}/ci-cache
+          TAGS: ${{ needs.check-version.outputs.version }}
+
+  pypi:
+    needs: [check-version, runner-image]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/duckless/${{ needs.check-version.outputs.version }}
+    permissions:
+      id-token: write # PyPI Trusted Publishing, no API token
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - run: uv build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: [check-version, pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
