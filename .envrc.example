@@ -1,0 +1,12 @@
+# cp .envrc.example .envrc && direnv allow   (.envrc is gitignored)
+export DUCKLESS_PROJECT=my-project
+export DUCKLESS_REGION=europe-west1
+export DUCKLESS_BUCKET="${DUCKLESS_PROJECT}-duckless-work"            # terraform output work_bucket
+export DUCKLESS_SA="duckless-runner@${DUCKLESS_PROJECT}.iam.gserviceaccount.com"
+export DUCKLESS_IMAGE="${DUCKLESS_REGION}-docker.pkg.dev/${DUCKLESS_PROJECT}/duckless/runner:0.1.0"
+# Optional: subnetwork with Private Google Access (job VMs have no external IP)
+# export DUCKLESS_NETWORK=default
+# export DUCKLESS_SUBNETWORK=default
+
+[ -d .venv ] && source .venv/bin/activate
+source_env_if_exists .envrc.local

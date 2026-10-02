@@ -1,0 +1,11 @@
+.envrc
+.envrc.local
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+dist/
+.terraform/
+*.tfstate*
+spike/results/

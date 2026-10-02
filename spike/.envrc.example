@@ -1,0 +1,8 @@
+# cp .envrc.example .envrc && direnv allow
+export DUCKLESS_PROJECT=gb-poc-373711
+export DUCKLESS_REGION=europe-west1
+export DUCKLESS_BUCKET="${DUCKLESS_PROJECT}-duckless-spike"
+export DUCKLESS_SA="duckless-runner@${DUCKLESS_PROJECT}.iam.gserviceaccount.com"
+export DUCKLESS_NETWORK="projects/${DUCKLESS_PROJECT}/global/networks/default"
+export DUCKLESS_SUBNETWORK="projects/${DUCKLESS_PROJECT}/regions/${DUCKLESS_REGION}/subnetworks/default"
+export DUCKLESS_IMAGE="${DUCKLESS_REGION}-docker.pkg.dev/${DUCKLESS_PROJECT}/duckless/runner:spike"

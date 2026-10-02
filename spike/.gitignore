@@ -1,0 +1,4 @@
+.envrc
+results/
+.venv/
+__pycache__/
