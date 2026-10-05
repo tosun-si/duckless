@@ -11,11 +11,11 @@ from typing import Annotated, Any
 import typer
 
 from duckless.core.errors import DucklessError
-from duckless.core.infra import InfraRequest, InfraStatus, envrc_lines
+from duckless.core.infra import InfraRequest, InfraStatus, default_runner_tag, envrc_lines
 from duckless.core.job import JobReport, JobRequest, JobState, LogLine
 from duckless.core.preflight import PreflightReport
 from duckless.settings import Settings, SettingsError
-from duckless.wiring import InfraServices, Services, gcp_infra_services, gcp_services
+from duckless.wiring import InfraServices, Services, cli_version, gcp_infra_services, gcp_services
 
 POLL_SECONDS = 10
 SETTLE_SECONDS = 5
@@ -187,11 +187,17 @@ def init(
     data_bucket: Annotated[
         list[str] | None, typer.Option("--data-bucket", help="Bucket jobs may read/write, repeatable")
     ] = None,
-    runner_tag: Annotated[str, typer.Option(help="Runner image tag")] = "edge",
+    runner_tag: Annotated[
+        str | None, typer.Option(help="Runner image tag (default: the CLI version, edge for dev builds)")
+    ] = None,
     name: Annotated[str, typer.Option(help="Prefix of the created resources")] = "duckless",
 ) -> None:
     """Deploy (or upgrade) DuckLess in a project with Infrastructure Manager."""
-    request = ctx.obj.infra_request(data_buckets=tuple(data_bucket or ()), runner_image_tag=runner_tag, name=name)
+    request = ctx.obj.infra_request(
+        data_buckets=tuple(data_bucket or ()),
+        runner_image_tag=runner_tag or default_runner_tag(cli_version()),
+        name=name,
+    )
     typer.echo(f"duckless init: {request.project} ({request.region})")
     status = _infra().init(request, lambda step: typer.echo(f"  - {step}"))
     _echo(infra_lines(status))

@@ -13,6 +13,7 @@ from duckless.core.infra import (
     InfraRequest,
     InfraStatus,
     InvalidInfraRequestError,
+    default_runner_tag,
     deployment_inputs,
     envrc_lines,
     with_bindings,
@@ -168,6 +169,18 @@ class TestInfraRequest:
 
         # then
         assert all(f'variable "{name}"' in variables for name in inputs)
+
+
+class TestDefaultRunnerTag:
+    @pytest.mark.parametrize(
+        ("version", "tag"),
+        [("0.1.0", "0.1.0"), ("1.2.3rc1", "1.2.3rc1"), ("0.1.0.dev0", "edge"), ("0.1.0+local", "edge")],
+    )
+    def test_given_cli_version_when_defaulting_then_released_versions_pin_their_own_image(
+        self, version: str, tag: str
+    ) -> None:
+        # when / then
+        assert default_runner_tag(version) == tag
 
 
 class TestWithBindings:
