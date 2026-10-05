@@ -4,12 +4,12 @@ Serverless DuckDB on GCP. Submit SQL or your own code; DuckLess runs it on a rig
 Compute Engine VM (Cloud Batch) **in your project**, reads and writes GCS through ADC
 (no HMAC keys), spills on local SSD, then tears the VM down. Nothing runs between jobs.
 
-> Status: v0.1.0 in progress. See `spike/README.md` for the measurements behind the design.
+> Status: v0.1.0, first release. See `CHANGELOG.md`, and `spike/README.md` for the measurements behind the design.
 
 ## Quick start
 
 ```bash
-uv tool install .                            # or: uv run duckless …
+uv tool install duckless                     # or: pip install duckless
 
 duckless init --project my-project --region europe-west1
 # prints the lines to put in .envrc (DUCKLESS_PROJECT, DUCKLESS_BUCKET, DUCKLESS_SA, DUCKLESS_IMAGE)
