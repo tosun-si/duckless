@@ -66,6 +66,11 @@ class InfraStatus:
         return self.error is None
 
 
+def default_runner_tag(cli_version: str) -> str:
+    """A released CLI runs the runner image of its own version; a dev build runs the edge image."""
+    return "edge" if any(marker in cli_version for marker in ("dev", "+")) else cli_version
+
+
 def deployment_id(request: InfraRequest) -> str:
     return request.name
 
