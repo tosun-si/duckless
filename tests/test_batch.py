@@ -1,6 +1,6 @@
 from google.cloud import batch_v1
 
-from duckless.adapters.batch import build_job, status_from_job
+from duckless.adapters.batch import build_job, container_invocation, status_from_job
 from duckless.core.job import JobKind, JobSpec, JobState
 from duckless.core.machine import MachineType
 from duckless.settings import Settings
@@ -72,6 +72,32 @@ class TestBuildJob:
         assert list(job.allocation_policy.instances[0].policy.disks) == []
         assert list(task.volumes) == []
         assert len(task.runnables) == 1
+
+
+class TestContainerInvocation:
+    def test_given_sql_job_when_invoking_then_image_entrypoint_is_kept(self) -> None:
+        # when / then
+        assert container_invocation(spec()) == ("", ["sql", "gs://work/job.sql"])
+
+    def test_given_command_job_when_invoking_then_command_replaces_the_entrypoint(self) -> None:
+        # given
+        command_spec = JobSpec(
+            job_id="dl-job-2",
+            kind=JobKind.COMMAND,
+            image="acme/dbt:1.2",
+            machine=MachineType.parse("n2-highmem-16"),
+            spot=False,
+            local_ssd_count=2,
+            max_run_seconds=600,
+            command=("dbt", "build", "--target", "duckless"),
+        )
+
+        # when
+        runner = build_job(command_spec, SETTINGS).task_groups[0].task_spec.runnables[-1]
+
+        # then
+        assert runner.container.entrypoint == "dbt"
+        assert list(runner.container.commands) == ["build", "--target", "duckless"]
 
 
 class TestStatusFromJob:
