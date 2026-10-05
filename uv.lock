@@ -291,6 +291,7 @@ source = { editable = "." }
 dependencies = [
     { name = "google-cloud-batch" },
     { name = "google-cloud-compute" },
+    { name = "google-cloud-config" },
     { name = "google-cloud-logging" },
     { name = "google-cloud-storage" },
     { name = "typer" },
@@ -306,6 +307,7 @@ dev = [
 requires-dist = [
     { name = "google-cloud-batch", specifier = ">=0.17" },
     { name = "google-cloud-compute", specifier = ">=1.20" },
+    { name = "google-cloud-config", specifier = ">=0.7" },
     { name = "google-cloud-logging", specifier = ">=3.11" },
     { name = "google-cloud-storage", specifier = ">=2.18" },
     { name = "typer", specifier = ">=0.15" },
@@ -412,6 +414,23 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e6/0e/2066f728618f25a32786524ed9a4c7f51fd562055298c6898834ece37840/google_cloud_compute-1.55.0.tar.gz", hash = "sha256:dfdaacca812db42238f9ad33baa7f5f5e0e35917645cccf1b38e8637f0dab9f6", size = 5471824, upload-time = "2026-10-01T18:15:41.985Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/23/39/708b0301319c73df2e38bcf851636ebeae976b342689c1aaca317f183a94/google_cloud_compute-1.55.0-py3-none-any.whl", hash = "sha256:1839d99a365a7e8c4c06d3078d164cc8e102de9a9b6a837d3e077c9bdec62fff", size = 4168994, upload-time = "2026-10-01T18:09:12.369Z" },
+]
+
+[[package]]
+name = "google-cloud-config"
+version = "0.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-api-core", extra = ["grpc"] },
+    { name = "google-auth" },
+    { name = "grpc-google-iam-v1" },
+    { name = "grpcio" },
+    { name = "proto-plus" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2b/b7/f915f6d1280fbca238333784622994d82cebd82330526284c6783275db2c/google_cloud_config-0.7.2.tar.gz", hash = "sha256:495346e3cacf7898157468c9eaab1ad26d21df543870ec87c5be274db6d1758a", size = 179127, upload-time = "2026-10-01T18:15:44.759Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/91/915e7c16f5d62c7da60c0d2887dfaf98295b7d516f63dd5235d719ec6ac5/google_cloud_config-0.7.2-py3-none-any.whl", hash = "sha256:b9216cd049b6813818a5e2b00b1bdf6787c33b549db9950ee217a1bc324e4a68", size = 125347, upload-time = "2026-10-01T18:09:15.538Z" },
 ]
 
 [[package]]

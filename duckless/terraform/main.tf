@@ -32,6 +32,7 @@ resource "google_storage_bucket" "work" {
   location                    = var.region
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
+  force_destroy               = var.force_destroy
   labels                      = local.labels
 
   lifecycle_rule {

@@ -8,6 +8,7 @@ requires-python = ">=3.13"
 dependencies = [
     "typer>=0.15",
     "google-cloud-batch>=0.17",
+    "google-cloud-config>=0.7",
     "google-cloud-compute>=1.20",
     "google-cloud-logging>=3.11",
     "google-cloud-storage>=2.18",

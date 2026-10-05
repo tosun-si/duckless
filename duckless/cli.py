@@ -3,6 +3,7 @@
 import os
 import time
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -10,10 +11,11 @@ from typing import Annotated, Any
 import typer
 
 from duckless.core.errors import DucklessError
+from duckless.core.infra import InfraRequest, InfraStatus, envrc_lines
 from duckless.core.job import JobReport, JobRequest, JobState, LogLine
 from duckless.core.preflight import PreflightReport
 from duckless.settings import Settings, SettingsError
-from duckless.wiring import Services, gcp_services
+from duckless.wiring import InfraServices, Services, gcp_infra_services, gcp_services
 
 POLL_SECONDS = 10
 SETTLE_SECONDS = 5
@@ -79,6 +81,13 @@ def preflight_lines(report: PreflightReport) -> list[str]:
     return [f"preflight {report.region}: {'ok' if report.ok else 'blocked'}", *checks]
 
 
+def infra_lines(status: InfraStatus) -> list[str]:
+    if not status.ok:
+        return [f"{status.deployment}: {status.state}", *(f"  {line}" for line in (status.error or "").splitlines())]
+    envrc = envrc_lines(status)
+    return [f"{status.deployment}: {status.state}", *(["", "# add to .envrc:", *envrc] if envrc else [])]
+
+
 def parse_env(pairs: list[str] | None) -> dict[str, str]:
     bad = [p for p in pairs or () if "=" not in p]
     if bad:
@@ -89,8 +98,38 @@ def parse_env(pairs: list[str] | None) -> dict[str, str]:
 # ---------- effects ----------
 
 
+@dataclass
+class CliContext:
+    """Options from the command line; job settings are only read by the commands that need them."""
+
+    project: str | None
+    region: str | None
+    _services: Services | None = field(default=None, repr=False)
+
+    def services(self) -> Services:
+        if self._services is None:
+            try:
+                settings = Settings.from_env(os.environ, project=self.project, region=self.region)
+            except SettingsError as e:
+                typer.echo(f"{e}\nrun `duckless init` first, it prints these lines.", err=True)
+                raise typer.Exit(2) from e
+            self._services = gcp_services(settings)
+        return self._services
+
+    def infra_request(self, **fields) -> InfraRequest:
+        project = self.project or os.environ.get("DUCKLESS_PROJECT")
+        region = self.region or os.environ.get("DUCKLESS_REGION", "europe-west1")
+        if not project:
+            raise typer.BadParameter("give --project or set DUCKLESS_PROJECT", param_hint="--project")
+        return InfraRequest(project=project, region=region, **fields)
+
+
 def _services(ctx: typer.Context) -> Services:
-    return ctx.obj
+    return ctx.obj.services()
+
+
+def _infra() -> InfraServices:
+    return gcp_infra_services()
 
 
 def _echo(lines: list[str]) -> None:
@@ -139,11 +178,43 @@ def main_options(
     project: Annotated[str | None, typer.Option(help="GCP project (default: $DUCKLESS_PROJECT)")] = None,
     region: Annotated[str | None, typer.Option(help="Region (default: $DUCKLESS_REGION or europe-west1)")] = None,
 ) -> None:
-    try:
-        ctx.obj = gcp_services(Settings.from_env(os.environ, project=project, region=region))
-    except SettingsError as e:
-        typer.echo(str(e), err=True)
-        raise typer.Exit(2) from e
+    ctx.obj = CliContext(project=project, region=region)
+
+
+@app.command()
+def init(
+    ctx: typer.Context,
+    data_bucket: Annotated[
+        list[str] | None, typer.Option("--data-bucket", help="Bucket jobs may read/write, repeatable")
+    ] = None,
+    runner_tag: Annotated[str, typer.Option(help="Runner image tag")] = "edge",
+    name: Annotated[str, typer.Option(help="Prefix of the created resources")] = "duckless",
+) -> None:
+    """Deploy (or upgrade) DuckLess in a project with Infrastructure Manager."""
+    request = ctx.obj.infra_request(data_buckets=tuple(data_bucket or ()), runner_image_tag=runner_tag, name=name)
+    typer.echo(f"duckless init: {request.project} ({request.region})")
+    status = _infra().init(request, lambda step: typer.echo(f"  - {step}"))
+    _echo(infra_lines(status))
+    raise typer.Exit(0 if status.ok else 1)
+
+
+@app.command()
+def destroy(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Option(help="Prefix given to init")] = "duckless",
+    force: Annotated[bool, typer.Option("--force", help="Also delete a non-empty work bucket")] = False,
+    yes: Annotated[bool, typer.Option("--yes", help="Do not ask for confirmation")] = False,
+) -> None:
+    """Delete everything `duckless init` created in the project."""
+    request = ctx.obj.infra_request(name=name, force_destroy=force)
+    if not yes:
+        typer.confirm(f"Delete the DuckLess deployment '{name}' in {request.project}?", abort=True)
+    if force:
+        typer.echo("  - re-applying with force_destroy so the work bucket can be deleted")
+        _infra().init(request, lambda step: typer.echo(f"    {step}"))
+    status = _infra().destroy(request, lambda step: typer.echo(f"  - {step}"))
+    _echo(infra_lines(status))
+    raise typer.Exit(0 if status.ok else 1)
 
 
 @app.command()

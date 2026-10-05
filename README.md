@@ -9,10 +9,10 @@ Compute Engine VM (Cloud Batch) **in your project**, reads and writes GCS throug
 ## Quick start
 
 ```bash
-cp .envrc.example .envrc && direnv allow     # DUCKLESS_PROJECT, DUCKLESS_BUCKET, …
-# infra: terraform/modules/duckless (APIs, work bucket, runner SA)
-
 uv tool install .                            # or: uv run duckless …
+
+duckless init --project my-project --region europe-west1
+# prints the lines to put in .envrc (DUCKLESS_PROJECT, DUCKLESS_BUCKET, DUCKLESS_SA, DUCKLESS_IMAGE)
 
 duckless preflight --machine n2-highmem-32 --spot
 duckless run job.sql --machine n2-highmem-32 --spot
@@ -20,7 +20,12 @@ duckless exec --image <your-image> --machine n2-highmem-16 -- dbt build
 duckless status <job-id>
 duckless logs <job-id> --follow
 duckless result <job-id>
+duckless destroy --project my-project       # removes what init created
 ```
+
+`init` applies the Terraform module shipped with the CLI (`duckless/terraform`) through
+Infrastructure Manager: no local Terraform, state kept in your project, re-run it to upgrade.
+Teams managing infra as code can use the same module directly instead.
 
 ## Writing jobs
 
@@ -45,7 +50,7 @@ Hexagonal, kept light: a pure core, ports, adapters, and one wiring point.
 | `duckless/wiring.py` | Binds the service functions to the adapters (lazily) |
 | `duckless/cli.py` | `duckless` command, a driving adapter |
 | `runtime/` | Runner image (`duckless_runtime`), published as `ghcr.io/tosun-si/duckless-runner`: DuckDB + `gcs` community extension, tuned for the VM |
-| `terraform/modules/duckless/` | APIs, work bucket, least-privilege runner service account, Artifact Registry remote repository proxying the runner image |
+| `duckless/terraform/` | APIs, work bucket, least-privilege runner service account, Artifact Registry remote repository proxying the runner image |
 | `spike/` | The spike that validated the approach, kept as a record |
 
 Dependency rule: `core` imports nothing else from DuckLess, `service` only `core` and `ports`,

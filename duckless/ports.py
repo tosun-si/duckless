@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
+from duckless.core.infra import InfraStatus
 from duckless.core.job import JobSpec, JobStatus, LogLine
 from duckless.core.quota import Quota
 
@@ -47,3 +48,51 @@ class LogReader(Protocol):
 
 class QuotaReader(Protocol):
     def regional_quotas(self, region: str) -> Mapping[str, Quota]: ...
+
+
+class InfraBootstrap(Protocol):
+    """What `init` sets up with the caller's credentials before Infra Manager can run."""
+
+    def enable_apis(self, project: str, apis: tuple[str, ...]) -> None: ...
+
+    def ensure_service_account(self, project: str, account_id: str, display_name: str) -> str:
+        """Returns the service account email."""
+        ...
+
+    def grant_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> bool:
+        """True when the project IAM policy changed (new grants take a while to propagate)."""
+        ...
+
+    def ensure_bucket(self, project: str, region: str, bucket: str) -> None: ...
+
+    def upload_directory(self, local_dir: Path, bucket: str, prefix: str) -> str:
+        """Returns the gs:// URI of the uploaded directory."""
+        ...
+
+    def revoke_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> None: ...
+
+    def delete_service_account(self, project: str, email: str) -> None:
+        """No-op when it does not exist."""
+        ...
+
+    def delete_bucket(self, bucket: str) -> None:
+        """Deletes its objects too; no-op when it does not exist."""
+        ...
+
+
+class InfraDeployer(Protocol):
+    """Infrastructure Manager: applies a Terraform module and keeps its state."""
+
+    def apply(
+        self,
+        project: str,
+        region: str,
+        deployment_id: str,
+        source_uri: str,
+        inputs: Mapping[str, Any],
+        service_account: str,
+    ) -> InfraStatus: ...
+
+    def get(self, project: str, region: str, deployment_id: str) -> InfraStatus | None: ...
+
+    def destroy(self, project: str, region: str, deployment_id: str) -> InfraStatus: ...

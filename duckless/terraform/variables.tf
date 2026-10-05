@@ -27,6 +27,12 @@ variable "runs_retention_days" {
   default     = 30
 }
 
+variable "force_destroy" {
+  description = "Let `duckless destroy` delete the work bucket even when it still holds objects."
+  type        = bool
+  default     = false
+}
+
 variable "data_buckets" {
   description = "Buckets the runner may read and write (Parquet data). The work bucket is always included."
   type        = list(string)
