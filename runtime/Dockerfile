@@ -34,6 +34,7 @@ RUN groupadd --system app \
  && chown app:app ${APP_DIR}
 
 COPY --from=builder --chown=app:app ${APP_DIR}/.venv ${APP_DIR}/.venv
+COPY --chown=app:app smoke_test.py ./
 
 USER app
 
