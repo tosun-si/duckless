@@ -14,6 +14,12 @@ dependencies = [
     "google-cloud-storage>=2.18",
 ]
 
+[project.urls]
+Homepage = "https://github.com/tosun-si/duckless"
+Repository = "https://github.com/tosun-si/duckless"
+Changelog = "https://github.com/tosun-si/duckless/releases"
+Issues = "https://github.com/tosun-si/duckless/issues"
+
 [project.scripts]
 duckless = "duckless.cli:main"
 
