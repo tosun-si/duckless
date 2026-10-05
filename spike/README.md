@@ -3,31 +3,38 @@
 Question: can a Cloud Batch VM run DuckDB on large Parquet in GCS, auth via ADC only (no HMAC),
 with spill on local SSD, fast enough and cheap enough to matter?
 
+The spike validated the approach (verdict below) and its code became the product: its runner
+is now `runtime/`, its submit script `duckless run`, its setup script `duckless init`. What is
+left here are the jobs and the BigQuery benchmark, to reproduce the numbers.
+
 ## Pieces
 
 | Path | What |
 | --- | --- |
-| `runner/` | Runner image: `duckless_runtime.connect()` = DuckDB + `gcs` community extension (ADC) + spill on local SSD + memory/threads sized to the VM. `python -m duckless_runtime sql|py <uri>` |
-| `submit.py` | Submits a job to Batch (machine, Spot, local SSD, no external IP), follows it, writes `results/<job-id>.json` (Batch timeline + runner metrics) |
-| `setup.sh` | Spike infra: Batch API, bucket, AR repo, runner SA + least-privilege roles |
-| `jobs/tpch_gen.sql` | Generates TPC-H at `TPCH_SF` and writes Parquet to GCS |
+| `jobs/tpch_gen.sql` | Generates TPC-H at `TPCH_SF` and writes Parquet to the work bucket |
 | `jobs/tpch_queries.sql` | Full scan + Q1/Q9/Q18/Q21 straight from GCS, writes an aggregate back |
-| `jobs/customer_segments.py` | A "pure-Python Cloud Run job" rewritten on DuckLess: SQL for the heavy part, Python for the business rule |
+| `jobs/write_bench.sql` | GCS write throughput: single writer vs `PER_THREAD_OUTPUT`, partitioned |
+| `jobs/customer_segments.py` | A "pure-Python Cloud Run job" rewritten on DuckLess: SQL for the heavy part, a vectorized Python rule |
+| `jobs/customer_segments_rowwise.py` | Same job with a row-wise Python UDF, kept to show why not to |
+| `bq_bench.py` | The same TPC-H queries on BigQuery on-demand, external or native tables |
 
-## Run
+## Reproduce
 
 ```bash
-cp .envrc.example .envrc && direnv allow
-./setup.sh
+duckless init --project <project> --region europe-west1   # then add the printed lines to .envrc
 
-docker buildx build --platform linux/amd64 -t "$DUCKLESS_IMAGE" --push runner/
+duckless run spike/jobs/tpch_gen.sql     -m n2-highmem-32 --spot -e TPCH_SF=100
+duckless run spike/jobs/tpch_queries.sql -m n2-highmem-32 --spot -e TPCH_SF=100
+duckless run spike/jobs/tpch_queries.sql -m n2-highmem-32 --spot -e TPCH_SF=100 -e DUCKLESS_MEMORY_FRACTION=0.03
+duckless run spike/jobs/write_bench.sql  -m n2-highmem-32 --spot -e TPCH_SF=100
+duckless run spike/jobs/customer_segments.py -m n2-highmem-16 --spot -e TPCH_SF=100
 
-uv run submit.py jobs/tpch_gen.sql     --machine n2-highmem-16 --local-ssd 2 --spot --env TPCH_SF=10
-uv run submit.py jobs/tpch_queries.sql --machine n2-highmem-32 --local-ssd 4 --spot --env TPCH_SF=100
-uv run submit.py jobs/customer_segments.py --machine n2-highmem-16 --local-ssd 2 --spot --env TPCH_SF=100
+uv run spike/bq_bench.py --sf 100 --mode external   # and --mode native
 ```
 
-## Findings (2026-09-30, europe-west1, gb-poc-373711)
+`dbgen` is mostly single-threaded: generating SF100 takes ~20 min whatever the machine.
+
+## Findings (2026-09-30 and 2026-10-01, europe-west1)
 
 **Verdict: go.** ADC-only GCS access works end to end on Batch VMs (metadata server, no HMAC), spill lands on local SSD,
 and on TPC-H SF100 DuckLess is as fast as BigQuery for ~20-80x less per run.
