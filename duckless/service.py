@@ -7,12 +7,24 @@ the GCP adapters. Rules stay in duckless.core, side effects go through the ports
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime
+from pathlib import Path
 
 from duckless.core.errors import DucklessError
+from duckless.core.infra import (
+    BOOTSTRAP_APIS,
+    INFRA_SA_ROLES,
+    InfraRequest,
+    InfraStatus,
+    deployment_id,
+    deployment_inputs,
+    infra_service_account_id,
+    module_prefix,
+    staging_bucket,
+)
 from duckless.core.job import JobReport, JobRequest, JobStatus, LogLine, merged_env, plan_job
 from duckless.core.machine import resolve_machine
 from duckless.core.preflight import PreflightReport, preflight_report, rejected_machine
-from duckless.ports import ArtifactStore, Executor, LogReader, QuotaReader
+from duckless.ports import ArtifactStore, Executor, InfraBootstrap, InfraDeployer, LogReader, QuotaReader
 
 
 def run_job(
@@ -55,3 +67,53 @@ def preflight(
     except DucklessError as e:
         return rejected_machine(region, str(e))
     return preflight_report(region, resolved, count, spot, quota_reader.regional_quotas(region))
+
+
+def init_infra(
+    request: InfraRequest,
+    *,
+    bootstrap: InfraBootstrap,
+    deployer: InfraDeployer,
+    module_dir: Path,
+    version: str,
+    on_step: Callable[[str], None],
+    wait_for_iam: Callable[[], None],
+) -> InfraStatus:
+    """Idempotent: a second run applies the module of the current CLI version (upgrade)."""
+    on_step("enabling the APIs Infra Manager needs")
+    bootstrap.enable_apis(request.project, BOOTSTRAP_APIS)
+
+    on_step("service account for Infra Manager")
+    infra_sa = bootstrap.ensure_service_account(
+        request.project, infra_service_account_id(request), "DuckLess infra (Infrastructure Manager)"
+    )
+    if bootstrap.grant_project_roles(request.project, f"serviceAccount:{infra_sa}", INFRA_SA_ROLES):
+        on_step("waiting for the new IAM grants to propagate")
+        wait_for_iam()
+
+    on_step(f"uploading the Terraform module {version}")
+    bucket = staging_bucket(request)
+    bootstrap.ensure_bucket(request.project, request.region, bucket)
+    source = bootstrap.upload_directory(module_dir, bucket, module_prefix(version))
+
+    on_step("applying with Infrastructure Manager (a few minutes)")
+    return deployer.apply(
+        request.project, request.region, deployment_id(request), source, deployment_inputs(request), infra_sa
+    )
+
+
+def destroy_infra(
+    request: InfraRequest, *, bootstrap: InfraBootstrap, deployer: InfraDeployer, on_step: Callable[[str], None]
+) -> InfraStatus:
+    """Deletes the deployment, then what `init` created outside Terraform (infra SA, its grants, staging)."""
+    on_step("deleting the Infra Manager deployment (a few minutes)")
+    status = deployer.destroy(request.project, request.region, deployment_id(request))
+    if not status.ok:
+        return status  # keep the infra SA: it is needed to retry the deletion
+
+    on_step("removing the Infra Manager service account and the staging bucket")
+    infra_sa = f"{infra_service_account_id(request)}@{request.project}.iam.gserviceaccount.com"
+    bootstrap.revoke_project_roles(request.project, f"serviceAccount:{infra_sa}", INFRA_SA_ROLES)
+    bootstrap.delete_service_account(request.project, infra_sa)
+    bootstrap.delete_bucket(staging_bucket(request))
+    return status
