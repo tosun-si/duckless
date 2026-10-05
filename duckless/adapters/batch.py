@@ -4,7 +4,7 @@ from google.api_core.exceptions import NotFound
 from google.cloud import batch_v1
 
 from duckless.core.errors import JobNotFoundError
-from duckless.core.job import JobEvent, JobSpec, JobState, JobStatus
+from duckless.core.job import JobEvent, JobKind, JobSpec, JobState, JobStatus
 from duckless.core.machine import LOCAL_SSD_GB
 from duckless.settings import Settings
 
@@ -28,15 +28,24 @@ _STATES = {
 # ---------- pure ----------
 
 
+def container_invocation(spec: JobSpec) -> tuple[str, list[str]]:
+    """(entrypoint, args). Runner jobs keep the image entrypoint (`python -m duckless_runtime`) and
+    pass `sql|py <uri>`; a command job replaces the entrypoint, so `-- dbt build` runs dbt itself."""
+    if spec.kind is JobKind.COMMAND:
+        return spec.command[0], list(spec.command[1:])
+    return "", list(spec.runner_args)
+
+
 def build_job(spec: JobSpec, settings: Settings) -> batch_v1.Job:
     has_scratch = spec.local_ssd_count > 0
+    entrypoint, args = container_invocation(spec)
     # Local SSD is mounted by Batch on the host as root; open it to the non-root runner user.
     prepare_scratch = batch_v1.Runnable(
         script=batch_v1.Runnable.Script(text=f"mkdir -p {SCRATCH_PATH} && chmod 1777 {SCRATCH_PATH}")
     )
     runner = batch_v1.Runnable(
         # Task volumes are bind-mounted into the container at the same path by default.
-        container=batch_v1.Runnable.Container(image_uri=spec.image, commands=list(spec.runner_args)),
+        container=batch_v1.Runnable.Container(image_uri=spec.image, entrypoint=entrypoint, commands=args),
         environment=batch_v1.Environment(variables={**dict(spec.env), "GOOGLE_CLOUD_PROJECT": settings.project}),
     )
     task = batch_v1.TaskSpec(
