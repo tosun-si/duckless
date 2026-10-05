@@ -1,6 +1,6 @@
 [project]
 name = "duckless"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Serverless DuckDB on GCP: run SQL or your own code on a right-sized VM in your project, then tear it down"
 readme = "README.md"
 license = "Apache-2.0"
@@ -13,6 +13,12 @@ dependencies = [
     "google-cloud-logging>=3.11",
     "google-cloud-storage>=2.18",
 ]
+
+[project.urls]
+Homepage = "https://github.com/tosun-si/duckless"
+Repository = "https://github.com/tosun-si/duckless"
+Changelog = "https://github.com/tosun-si/duckless/releases"
+Issues = "https://github.com/tosun-si/duckless/issues"
 
 [project.scripts]
 duckless = "duckless.cli:main"
