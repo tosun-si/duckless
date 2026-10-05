@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AR_LOCATION: europe
-  AR_PROJECT: duckless-public
+  IMAGE: ghcr.io/${{ github.repository_owner }}/duckless-runner
+  CACHE_IMAGE: ghcr.io/${{ github.repository_owner }}/duckless-runner-cache
 
 jobs:
   lint-and-test:
@@ -33,23 +33,21 @@ jobs:
 
   terraform:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        dir: [terraform/modules/duckless, infra/public]
+    defaults:
+      run:
+        working-directory: terraform/modules/duckless
     steps:
       - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v4
       - run: terraform fmt -check -recursive
-        working-directory: ${{ matrix.dir }}
       - run: terraform init -backend=false -input=false && terraform validate
-        working-directory: ${{ matrix.dir }}
 
   runner-image:
     needs: lint-and-test
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # WIF, used on main only
+      packages: write # push to ghcr.io with GITHUB_TOKEN, on main only
     env:
       PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     steps:
@@ -64,22 +62,19 @@ jobs:
           set: |
             *.output=type=docker
         env:
+          IMAGE: duckless-runner
+          CACHE_IMAGE: "" # no registry login on PRs; the push below reuses this builder's cache
           TAGS: ci
 
       - name: Smoke test
-        run: docker run --rm --entrypoint python duckless/runner:ci /usr/local/src/app/smoke_test.py
+        run: docker run --rm --entrypoint python duckless-runner:ci /usr/local/src/app/smoke_test.py
 
       - if: env.PUBLISH == 'true'
-        uses: google-github-actions/auth@v3
+        uses: docker/login-action@v4
         with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_CI_SA }}
-
-      - if: env.PUBLISH == 'true'
-        uses: google-github-actions/setup-gcloud@v3
-
-      - if: env.PUBLISH == 'true'
-        run: gcloud auth configure-docker ${{ env.AR_LOCATION }}-docker.pkg.dev --quiet
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push edge image
         if: env.PUBLISH == 'true'
@@ -89,6 +84,4 @@ jobs:
           files: docker-bake.hcl
           push: true
         env:
-          REGISTRY: ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.AR_PROJECT }}/duckless
-          CACHE_REGISTRY: ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.AR_PROJECT }}/ci-cache
           TAGS: edge,sha-${{ github.sha }}

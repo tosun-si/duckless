@@ -33,10 +33,22 @@ variable "data_buckets" {
   default     = []
 }
 
-variable "runner_image_repository" {
-  description = "Artifact Registry repository the runner pulls from, as projects/<p>/locations/<l>/repositories/<r>. Null when the image is public."
+variable "runner_image_registry" {
+  description = "Upstream registry of the runner image, proxied by an Artifact Registry remote repository."
   type        = string
-  default     = null
+  default     = "https://ghcr.io"
+}
+
+variable "runner_image_path" {
+  description = "Runner image path in the upstream registry."
+  type        = string
+  default     = "tosun-si/duckless-runner"
+}
+
+variable "runner_image_tag" {
+  description = "Runner image tag; pin it to the duckless CLI version."
+  type        = string
+  default     = "edge"
 }
 
 variable "labels" {

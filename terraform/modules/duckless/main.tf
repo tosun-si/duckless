@@ -72,12 +72,37 @@ resource "google_storage_bucket_iam_member" "runner_data" {
   depends_on = [google_storage_bucket.work]
 }
 
-resource "google_artifact_registry_repository_iam_member" "runner_pull" {
-  count = var.runner_image_repository == null ? 0 : 1
+locals {
+  runner_image = "${google_artifact_registry_repository.runner.location}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.runner.repository_id}/${var.runner_image_path}:${var.runner_image_tag}"
+}
 
-  project    = split("/", var.runner_image_repository)[1]
-  location   = split("/", var.runner_image_repository)[3]
-  repository = split("/", var.runner_image_repository)[5]
+# Pull-through cache of the public runner image: job VMs have no external IP and reach
+# Artifact Registry through Private Google Access; the image is cached in the region.
+resource "google_artifact_registry_repository" "runner" {
+  project       = var.project_id
+  location      = var.region
+  repository_id = "${var.name}-runner"
+  description   = "DuckLess runner image, proxied from ${var.runner_image_registry}"
+  format        = "DOCKER"
+  mode          = "REMOTE_REPOSITORY"
+  labels        = local.labels
+
+  remote_repository_config {
+    description = var.runner_image_registry
+    docker_repository {
+      custom_repository {
+        uri = var.runner_image_registry
+      }
+    }
+  }
+
+  depends_on = [google_project_service.this]
+}
+
+resource "google_artifact_registry_repository_iam_member" "runner_pull" {
+  project    = var.project_id
+  location   = google_artifact_registry_repository.runner.location
+  repository = google_artifact_registry_repository.runner.name
   role       = "roles/artifactregistry.reader"
   member     = google_service_account.runner.member
 }

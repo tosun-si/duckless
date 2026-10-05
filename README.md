@@ -44,8 +44,8 @@ Hexagonal, kept light: a pure core, ports, adapters, and one wiring point.
 | `duckless/adapters/` | GCP implementations: Cloud Batch, GCS, Cloud Logging, Compute quotas |
 | `duckless/wiring.py` | Binds the service functions to the adapters (lazily) |
 | `duckless/cli.py` | `duckless` command, a driving adapter |
-| `runtime/` | Runner image (`duckless_runtime`): DuckDB + `gcs` community extension, tuned for the VM |
-| `terraform/modules/duckless/` | APIs, work bucket, least-privilege runner service account |
+| `runtime/` | Runner image (`duckless_runtime`), published as `ghcr.io/tosun-si/duckless-runner`: DuckDB + `gcs` community extension, tuned for the VM |
+| `terraform/modules/duckless/` | APIs, work bucket, least-privilege runner service account, Artifact Registry remote repository proxying the runner image |
 | `spike/` | The spike that validated the approach, kept as a record |
 
 Dependency rule: `core` imports nothing else from DuckLess, `service` only `core` and `ports`,

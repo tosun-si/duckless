@@ -5,8 +5,8 @@ on:
     tags: ['v*.*.*']
 
 env:
-  AR_LOCATION: europe
-  AR_PROJECT: duckless-public
+  IMAGE: ghcr.io/${{ github.repository_owner }}/duckless-runner
+  CACHE_IMAGE: ghcr.io/${{ github.repository_owner }}/duckless-runner-cache
 
 jobs:
   check-version:
@@ -33,24 +33,21 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
+      packages: write
     steps:
       - uses: actions/checkout@v7
-      - uses: google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_CI_SA }}
-      - uses: google-github-actions/setup-gcloud@v3
-      - run: gcloud auth configure-docker ${{ env.AR_LOCATION }}-docker.pkg.dev --quiet
       - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/bake-action@v7
         with:
           source: .
           files: docker-bake.hcl
           push: true
         env:
-          REGISTRY: ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.AR_PROJECT }}/duckless
-          CACHE_REGISTRY: ${{ env.AR_LOCATION }}-docker.pkg.dev/${{ env.AR_PROJECT }}/ci-cache
           TAGS: ${{ needs.check-version.outputs.version }}
 
   pypi:

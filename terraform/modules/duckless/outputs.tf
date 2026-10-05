@@ -8,6 +8,11 @@ output "runner_service_account" {
   value       = google_service_account.runner.email
 }
 
+output "runner_image" {
+  description = "DUCKLESS_IMAGE: the runner image, pulled through the remote repository."
+  value       = local.runner_image
+}
+
 output "envrc" {
   description = "Lines to paste in .envrc."
   value       = <<-EOT
@@ -15,5 +20,6 @@ output "envrc" {
     export DUCKLESS_REGION=${var.region}
     export DUCKLESS_BUCKET=${google_storage_bucket.work.name}
     export DUCKLESS_SA=${google_service_account.runner.email}
+    export DUCKLESS_IMAGE=${local.runner_image}
   EOT
 }
