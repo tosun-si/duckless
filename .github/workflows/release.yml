@@ -57,6 +57,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write # sign the provenance attestation (Sigstore, keyless)
+      attestations: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -67,13 +69,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/bake-action@v7
+      - id: push
+        uses: docker/bake-action@v7
         with:
           source: .
           files: docker-bake.hcl
           push: true
         env:
           TAGS: ${{ needs.check-version.outputs.version }}
+      - uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ fromJSON(steps.push.outputs.metadata).runner['containerimage.digest'] }}
+          push-to-registry: true
 
   pypi:
     needs: [check-version, runner-image]
