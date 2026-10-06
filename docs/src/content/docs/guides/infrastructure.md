@@ -95,7 +95,7 @@ Teams that manage their infrastructure as code can use the module instead of `in
 
 ```hcl
 module "duckless" {
-  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.1.0"
+  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.1.1"
 
   project_id   = "my-project"
   region       = "europe-west1"
