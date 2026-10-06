@@ -10,10 +10,12 @@ you upgrade after installing a newer CLI.
 
 1. Enables the APIs Infrastructure Manager needs (`config`, `iam`, `cloudresourcemanager`,
    `serviceusage`, `storage`).
-2. Creates a service account for Infrastructure Manager, `duckless-infra`, and grants it the
+2. Checks the organization policies that would make the deployment fail (see below), and
+   stops there, with nothing created, if one does.
+3. Creates a service account for Infrastructure Manager, `duckless-infra`, and grants it the
    roles it needs to apply the module.
-3. Uploads the Terraform module shipped with the CLI to a small staging bucket.
-4. Asks Infrastructure Manager to apply it, and prints the `.envrc` lines from its outputs.
+4. Uploads the Terraform module shipped with the CLI to a small staging bucket.
+5. Asks Infrastructure Manager to apply it, and prints the `.envrc` lines from its outputs.
 
 The module creates:
 
@@ -42,6 +44,23 @@ To let jobs read or write other buckets, list them at init time:
 ```bash
 duckless init --project my-project --data-bucket my-lake --data-bucket my-exports
 ```
+
+## Organization policies
+
+In an organization, policies set on folders or on the organization can forbid what `init`
+needs. Rather than letting Infrastructure Manager fail on them minutes later, `init` reads
+the project's effective policies first:
+
+| Constraint | Blocks `init` when |
+| --- | --- |
+| `iam.disableServiceAccountCreation` | it is enforced: `init` creates two service accounts |
+| `gcp.resourceLocations` | the region is denied |
+| `gcp.restrictServiceUsage` | one of the APIs DuckLess uses is not allowed |
+| `gcp.restrictNonCmekServices` | Cloud Storage or Artifact Registry require customer-managed keys, which DuckLess does not set yet |
+
+When `gcp.resourceLocations` allows a list of groups that doesn't name the region directly,
+`init` only warns: a nested group may still cover it. Ask your organization administrators
+for an exception on the project, or use a project where these constraints are relaxed.
 
 ## Networking
 
