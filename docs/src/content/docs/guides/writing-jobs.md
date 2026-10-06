@@ -79,6 +79,7 @@ works on whole arrays and register it as an Arrow UDF:
 import numpy as np
 import pyarrow as pa
 
+
 def segment(revenue: np.ndarray, orders: np.ndarray) -> np.ndarray:
     return np.select(
         [revenue > 2_000_000, revenue / np.maximum(orders, 1) > 150_000],
@@ -86,8 +87,10 @@ def segment(revenue: np.ndarray, orders: np.ndarray) -> np.ndarray:
         default="regular",
     )
 
+
 def segment_arrow(revenue: pa.Array, orders: pa.Array) -> pa.Array:
     return pa.array(segment(revenue.to_numpy(zero_copy_only=False), orders.to_numpy(zero_copy_only=False)))
+
 
 con.create_function("segment", segment_arrow, ["DOUBLE", "BIGINT"], "VARCHAR", type="arrow")
 ```
