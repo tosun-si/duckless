@@ -7,6 +7,7 @@ from typing import Any, Protocol
 
 from duckless.core.infra import InfraStatus
 from duckless.core.job import JobSpec, JobStatus, LogLine
+from duckless.core.org_policy import OrgPolicy
 from duckless.core.quota import Quota
 
 
@@ -54,6 +55,10 @@ class InfraBootstrap(Protocol):
     """What `init` sets up with the caller's credentials before Infra Manager can run."""
 
     def enable_apis(self, project: str, apis: tuple[str, ...]) -> None: ...
+
+    def effective_org_policy(self, project: str, constraint: str) -> OrgPolicy:
+        """Policy that applies to the project, inherited from folders and organization."""
+        ...
 
     def ensure_service_account(self, project: str, account_id: str, display_name: str) -> str:
         """Returns the service account email."""

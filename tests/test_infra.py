@@ -19,15 +19,20 @@ from duckless.core.infra import (
     with_bindings,
     without_bindings,
 )
+from duckless.core.org_policy import SA_CREATION, OrgPolicy
 
 REQUEST = InfraRequest(project="acme-data", region="europe-west1", data_buckets=("acme-lake",))
 SA = "duckless-infra@acme-data.iam.gserviceaccount.com"
 
 
 class FakeBootstrap:
-    def __init__(self, policy_changes: bool = True) -> None:
+    def __init__(self, policy_changes: bool = True, org_policies: dict[str, OrgPolicy] | None = None) -> None:
         self.calls: list[str] = []
         self.policy_changes = policy_changes
+        self.org_policies = org_policies or {}
+
+    def effective_org_policy(self, project: str, constraint: str) -> OrgPolicy:
+        return self.org_policies.get(constraint, OrgPolicy(constraint))
 
     def enable_apis(self, project: str, apis: tuple[str, ...]) -> None:
         self.calls.append("apis")
@@ -114,6 +119,20 @@ class TestInitInfra:
         assert inputs["data_buckets"] == ["acme-lake"]
         assert status.ok
         assert waits == [1]
+
+    def test_given_blocking_org_policy_when_init_then_stops_before_creating_anything(self) -> None:
+        # given
+        bootstrap = FakeBootstrap(org_policies={SA_CREATION: OrgPolicy(SA_CREATION, enforced=True)})
+        deployer = FakeDeployer()
+
+        # when
+        status = init(bootstrap, deployer, [])
+
+        # then
+        assert status.state == "BLOCKED"
+        assert "disableServiceAccountCreation" in (status.error or "")
+        assert bootstrap.calls == ["apis"]
+        assert deployer.applied == []
 
     def test_given_grants_already_in_place_when_init_then_does_not_wait_for_iam(self) -> None:
         # given

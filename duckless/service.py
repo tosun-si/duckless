@@ -23,6 +23,7 @@ from duckless.core.infra import (
 )
 from duckless.core.job import JobReport, JobRequest, JobStatus, LogLine, merged_env, plan_job
 from duckless.core.machine import resolve_machine
+from duckless.core.org_policy import CONSTRAINTS, org_policy_checks
 from duckless.core.preflight import PreflightReport, preflight_report, rejected_machine
 from duckless.ports import ArtifactStore, Executor, InfraBootstrap, InfraDeployer, LogReader, QuotaReader
 
@@ -82,6 +83,18 @@ def init_infra(
     """Idempotent: a second run applies the module of the current CLI version (upgrade)."""
     on_step("enabling the APIs Infra Manager needs")
     bootstrap.enable_apis(request.project, BOOTSTRAP_APIS)
+
+    on_step("checking organization policies")
+    policies = {c: bootstrap.effective_org_policy(request.project, c) for c in CONSTRAINTS}
+    checks = org_policy_checks(request.region, policies)
+    for check in checks:
+        on_step(f"  {'ok  ' if check.ok else 'FAIL'}  {check.name}: {check.detail}")
+    blocking = [c for c in checks if not c.ok]
+    if blocking:
+        # Nothing created yet: stop before Infra Manager fails on it minutes later.
+        return InfraStatus(
+            deployment_id(request), "BLOCKED", error="\n".join(f"{c.name}: {c.detail}" for c in blocking)
+        )
 
     on_step("service account for Infra Manager")
     infra_sa = bootstrap.ensure_service_account(

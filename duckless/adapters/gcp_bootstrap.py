@@ -8,6 +8,7 @@ from google.auth.transport.requests import AuthorizedSession
 from google.cloud import storage
 
 from duckless.core.infra import with_bindings, without_bindings
+from duckless.core.org_policy import OrgPolicy
 
 SERVICE_USAGE = "https://serviceusage.googleapis.com/v1"
 IAM = "https://iam.googleapis.com/v1"
@@ -22,6 +23,19 @@ def module_files(local_dir: Path) -> list[Path]:
         p
         for p in local_dir.rglob("*")
         if p.is_file() and not SKIPPED_PARTS.intersection(p.relative_to(local_dir).parts)
+    )
+
+
+def parse_org_policy(constraint: str, body: dict) -> OrgPolicy:
+    """Resource Manager v1 getEffectiveOrgPolicy: a booleanPolicy or a listPolicy (or neither: default)."""
+    boolean = body.get("booleanPolicy") or {}
+    listed = body.get("listPolicy") or {}
+    return OrgPolicy(
+        constraint=constraint,
+        enforced=bool(boolean.get("enforced", False)),
+        all_values=listed.get("allValues"),
+        allowed=tuple(listed.get("allowedValues", ())),
+        denied=tuple(listed.get("deniedValues", ())),
     )
 
 
@@ -47,6 +61,14 @@ class GcpInfraBootstrap:
             "POST", f"{SERVICE_USAGE}/projects/{project}/services:batchEnable", json={"serviceIds": list(apis)}
         )
         self._wait(SERVICE_USAGE, operation)
+
+    def effective_org_policy(self, project: str, constraint: str) -> OrgPolicy:
+        body = self._call(
+            "POST",
+            f"https://cloudresourcemanager.googleapis.com/v1/projects/{project}:getEffectiveOrgPolicy",
+            json={"constraint": constraint},
+        )
+        return parse_org_policy(constraint, body)
 
     def ensure_service_account(self, project: str, account_id: str, display_name: str) -> str:
         email = f"{account_id}@{project}.iam.gserviceaccount.com"
