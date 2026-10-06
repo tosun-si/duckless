@@ -3,7 +3,7 @@
 import os
 import time
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -31,6 +31,9 @@ LocalSsd = Annotated[
 Env = Annotated[list[str] | None, typer.Option("--env", "-e", help="KEY=VALUE passed to the job, repeatable")]
 MaxRun = Annotated[int, typer.Option("--max-run-seconds", help="Hard limit on the job duration")]
 Wait = Annotated[bool, typer.Option("--wait/--no-wait", help="Follow the job until it ends")]
+# Accepted before or after the command name (`duckless --project p init` or `duckless init --project p`).
+Project = Annotated[str | None, typer.Option(help="GCP project (default: $DUCKLESS_PROJECT)")]
+Region = Annotated[str | None, typer.Option(help="Region (default: $DUCKLESS_REGION or europe-west1)")]
 
 
 # ---------- rendering (pure) ----------
@@ -124,8 +127,10 @@ class CliContext:
         return InfraRequest(project=project, region=region, **fields)
 
 
-def _services(ctx: typer.Context) -> Services:
-    return ctx.obj.services()
+def _scoped(ctx: typer.Context, project: str | None, region: str | None) -> CliContext:
+    """Command-level --project / --region win over the global ones."""
+    base: CliContext = ctx.obj
+    return replace(base, project=project or base.project, region=region or base.region, _services=None)
 
 
 def _infra() -> InfraServices:
@@ -160,8 +165,8 @@ def _follow(services: Services, job_id: str) -> int:
         time.sleep(POLL_SECONDS)
 
 
-def _submit(ctx: typer.Context, request: JobRequest, wait: bool) -> None:
-    services = _services(ctx)
+def _submit(cli: CliContext, request: JobRequest, wait: bool) -> None:
+    services = cli.services()
     try:
         status = services.run_job(request)
     except DucklessError as e:
@@ -175,8 +180,8 @@ def _submit(ctx: typer.Context, request: JobRequest, wait: bool) -> None:
 @app.callback()
 def main_options(
     ctx: typer.Context,
-    project: Annotated[str | None, typer.Option(help="GCP project (default: $DUCKLESS_PROJECT)")] = None,
-    region: Annotated[str | None, typer.Option(help="Region (default: $DUCKLESS_REGION or europe-west1)")] = None,
+    project: Project = None,
+    region: Region = None,
 ) -> None:
     ctx.obj = CliContext(project=project, region=region)
 
@@ -191,9 +196,11 @@ def init(
         str | None, typer.Option(help="Runner image tag (default: the CLI version, edge for dev builds)")
     ] = None,
     name: Annotated[str, typer.Option(help="Prefix of the created resources")] = "duckless",
+    project: Project = None,
+    region: Region = None,
 ) -> None:
     """Deploy (or upgrade) DuckLess in a project with Infrastructure Manager."""
-    request = ctx.obj.infra_request(
+    request = _scoped(ctx, project, region).infra_request(
         data_buckets=tuple(data_bucket or ()),
         runner_image_tag=runner_tag or default_runner_tag(cli_version()),
         name=name,
@@ -210,9 +217,11 @@ def destroy(
     name: Annotated[str, typer.Option(help="Prefix given to init")] = "duckless",
     force: Annotated[bool, typer.Option("--force", help="Also delete a non-empty work bucket")] = False,
     yes: Annotated[bool, typer.Option("--yes", help="Do not ask for confirmation")] = False,
+    project: Project = None,
+    region: Region = None,
 ) -> None:
     """Delete everything `duckless init` created in the project."""
-    request = ctx.obj.infra_request(name=name, force_destroy=force)
+    request = _scoped(ctx, project, region).infra_request(name=name, force_destroy=force)
     if not yes:
         typer.confirm(f"Delete the DuckLess deployment '{name}' in {request.project}?", abort=True)
     if force:
@@ -233,6 +242,8 @@ def run(
     env: Env = None,
     max_run_seconds: MaxRun = 3 * 3600,
     wait: Wait = True,
+    project: Project = None,
+    region: Region = None,
 ) -> None:
     """Run a .sql or .py file on the default runner (DuckDB + GCS via ADC)."""
     request = JobRequest(
@@ -243,7 +254,7 @@ def run(
         env=parse_env(env),
         max_run_seconds=max_run_seconds,
     )
-    _submit(ctx, request, wait)
+    _submit(_scoped(ctx, project, region), request, wait)
 
 
 @app.command("exec")
@@ -257,6 +268,8 @@ def exec_(
     env: Env = None,
     max_run_seconds: MaxRun = 3 * 3600,
     wait: Wait = True,
+    project: Project = None,
+    region: Region = None,
 ) -> None:
     """Run your own image + command, e.g. `duckless exec --image … -- dbt build`."""
     request = JobRequest(
@@ -268,13 +281,13 @@ def exec_(
         env=parse_env(env),
         max_run_seconds=max_run_seconds,
     )
-    _submit(ctx, request, wait)
+    _submit(_scoped(ctx, project, region), request, wait)
 
 
 @app.command()
-def status(ctx: typer.Context, job_id: str) -> None:
+def status(ctx: typer.Context, job_id: str, project: Project = None, region: Region = None) -> None:
     """Job state, timeline and, once over, the runner's metrics."""
-    _echo(report_lines(_services(ctx).get_job(job_id)))
+    _echo(report_lines(_scoped(ctx, project, region).services().get_job(job_id)))
 
 
 @app.command()
@@ -282,9 +295,11 @@ def logs(
     ctx: typer.Context,
     job_id: str,
     follow: Annotated[bool, typer.Option("--follow", "-f")] = False,
+    project: Project = None,
+    region: Region = None,
 ) -> None:
     """Runner logs from Cloud Logging."""
-    services = _services(ctx)
+    services = _scoped(ctx, project, region).services()
     since = None
     while True:
         lines = services.job_logs(job_id, since)
@@ -297,9 +312,9 @@ def logs(
 
 
 @app.command()
-def result(ctx: typer.Context, job_id: str) -> None:
+def result(ctx: typer.Context, job_id: str, project: Project = None, region: Region = None) -> None:
     """Rows of the job's last SELECT (first 20)."""
-    report = _services(ctx).get_job(job_id)
+    report = _scoped(ctx, project, region).services().get_job(job_id)
     if not report.status.state.is_terminal:
         typer.echo(f"{job_id} is still {report.status.state}", err=True)
         raise typer.Exit(1)
@@ -307,18 +322,23 @@ def result(ctx: typer.Context, job_id: str) -> None:
 
 
 @app.command()
-def cancel(ctx: typer.Context, job_id: str) -> None:
+def cancel(ctx: typer.Context, job_id: str, project: Project = None, region: Region = None) -> None:
     """Cancel a queued or running job."""
-    _services(ctx).cancel_job(job_id)
+    _scoped(ctx, project, region).services().cancel_job(job_id)
     typer.echo(f"cancellation requested for {job_id}")
 
 
 @app.command()
 def preflight(
-    ctx: typer.Context, machine: Machine = "n2-highmem-16", spot: Spot = False, local_ssd: LocalSsd = None
+    ctx: typer.Context,
+    machine: Machine = "n2-highmem-16",
+    spot: Spot = False,
+    local_ssd: LocalSsd = None,
+    project: Project = None,
+    region: Region = None,
 ) -> None:
     """Check a machine choice against GCE rules and the region's quotas."""
-    report = _services(ctx).preflight(machine, spot, local_ssd)
+    report = _scoped(ctx, project, region).services().preflight(machine, spot, local_ssd)
     _echo(preflight_lines(report))
     raise typer.Exit(0 if report.ok else 1)
 
