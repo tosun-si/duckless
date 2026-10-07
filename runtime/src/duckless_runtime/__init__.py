@@ -7,6 +7,7 @@ User code only needs `duckless_runtime.connect()`: GCS auth (ADC via the
 
 import json
 import os
+import resource
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -19,6 +20,8 @@ MEMORY_FRACTION = float(os.environ.get("DUCKLESS_MEMORY_FRACTION", "0.8"))
 # gRPC measured faster than HTTP on every read/write case of the spike.
 GCS_GRPC = os.environ.get("DUCKLESS_GCS_GRPC", "true").lower() == "true"
 CGROUP_CPU_MAX = Path("/sys/fs/cgroup/cpu.max")
+# The gcs extension's gRPC transport opens many sockets; container defaults (often 1024) run out.
+OPEN_FILES_TARGET = 65536
 
 
 @dataclass(frozen=True)
@@ -87,7 +90,27 @@ def session_sql(settings: RuntimeSettings) -> tuple[str, ...]:
     )
 
 
+def open_files_target(soft: int, hard: int, wanted: int = OPEN_FILES_TARGET) -> int:
+    """Soft limit to ask for: `wanted`, capped by the hard limit, never lower than today."""
+    cap = wanted if hard == resource.RLIM_INFINITY else min(wanted, hard)
+    return max(soft, cap)
+
+
+def raise_open_files_limit() -> int:
+    """Raises the soft RLIMIT_NOFILE up to the hard limit (no privilege needed); returns the limit in force."""
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    target = open_files_target(soft, hard)
+    if target == soft:
+        return soft
+    try:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+        return target
+    except (OSError, ValueError):  # some platforms refuse values above their own per-process cap
+        return soft
+
+
 def connect(database: str = ":memory:") -> duckdb.DuckDBPyConnection:
+    open_files = raise_open_files_limit()
     settings = runtime_settings()
     Path(settings.temp_directory).mkdir(parents=True, exist_ok=True)
 
@@ -96,7 +119,13 @@ def connect(database: str = ":memory:") -> duckdb.DuckDBPyConnection:
     for statement in session_sql(settings):
         con.sql(statement)
 
-    log("duckdb_connected", duckdb_version=duckdb.__version__, python=sys.version.split()[0], **asdict(settings))
+    log(
+        "duckdb_connected",
+        duckdb_version=duckdb.__version__,
+        python=sys.version.split()[0],
+        open_files_limit=open_files,
+        **asdict(settings),
+    )
     return con
 
 
