@@ -80,6 +80,14 @@ class InfraBootstrap(Protocol):
         """No-op when it does not exist."""
         ...
 
+    def has_private_service_access(self, project: str, network: str) -> bool:
+        """True when the network is already peered with Google services (servicenetworking)."""
+        ...
+
+    def create_private_service_access(self, project: str, network: str, range_name: str) -> None:
+        """Reserves a /20 range (labelled app=duckless) and peers the network with Google services."""
+        ...
+
     def delete_cloud_run_jobs(self, project: str, region: str, service_account: str) -> int:
         """DuckLess Cloud Run jobs (one per run) running as this service account; returns how many."""
         ...

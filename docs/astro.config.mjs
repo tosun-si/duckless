@@ -36,6 +36,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Writing jobs', slug: 'guides/writing-jobs' },
 						{ label: 'Machines, Spot and spill', slug: 'guides/machines' },
+						{ label: 'DuckLake tables', slug: 'guides/ducklake' },
 						{ label: 'Infrastructure', slug: 'guides/infrastructure' },
 					],
 				},

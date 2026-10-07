@@ -206,6 +206,16 @@ def init(
         str | None, typer.Option(help="Runner image tag (default: the CLI version, edge for dev builds)")
     ] = None,
     name: Annotated[str, typer.Option(help="Prefix of the created resources")] = "duckless",
+    ducklake: Annotated[
+        bool | None,
+        typer.Option(
+            "--ducklake/--no-ducklake",
+            help="Create a DuckLake catalog (Cloud SQL Postgres, private IP); default: keep the deployment's choice",
+        ),
+    ] = None,
+    network: Annotated[
+        str | None, typer.Option(help="VPC network of the jobs and the catalog (default: the deployment's, or default)")
+    ] = None,
     project: Project = None,
     region: Region = None,
 ) -> None:
@@ -214,6 +224,8 @@ def init(
         data_buckets=tuple(data_bucket or ()),
         runner_image_tag=runner_tag or default_runner_tag(cli_version()),
         name=name,
+        ducklake=ducklake,
+        network=network,
     )
     typer.echo(f"duckless init: {request.project} ({request.region})")
     status = _infra().init(request, lambda step: typer.echo(f"  - {step}"))

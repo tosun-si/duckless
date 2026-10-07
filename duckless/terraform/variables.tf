@@ -62,3 +62,21 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "ducklake" {
+  description = "Create a DuckLake catalog: a Cloud SQL Postgres instance on a private IP, used by every job."
+  type        = bool
+  default     = false
+}
+
+variable "network" {
+  description = "VPC network of the job VMs and of the catalog's private IP."
+  type        = string
+  default     = "default"
+}
+
+variable "catalog_tier" {
+  description = "Cloud SQL machine tier of the catalog. It holds metadata only; db-g1-small fits most lakes."
+  type        = string
+  default     = "db-g1-small"
+}

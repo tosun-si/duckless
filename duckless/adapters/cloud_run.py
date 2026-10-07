@@ -32,6 +32,18 @@ def container_invocation(spec: JobSpec) -> tuple[list[str], list[str]]:
     return [], list(spec.runner_args)
 
 
+def vpc_access(settings: Settings) -> run_v2.VpcAccess | None:
+    """Direct VPC egress to reach the DuckLake catalog's private IP; Google APIs keep their usual path."""
+    if settings.lake is None:
+        return None
+    return run_v2.VpcAccess(
+        network_interfaces=[
+            run_v2.VpcAccess.NetworkInterface(network=settings.network, subnetwork=settings.subnetwork)
+        ],
+        egress=run_v2.VpcAccess.VpcEgress.PRIVATE_RANGES_ONLY,
+    )
+
+
 def build_job(spec: JobSpec, settings: Settings) -> run_v2.Job:
     shape = cloud_run_shape(spec.machine)
     if shape is None:
@@ -61,6 +73,7 @@ def build_job(spec: JobSpec, settings: Settings) -> run_v2.Job:
                 timeout=f"{spec.max_run_seconds}s",
                 service_account=settings.service_account,
                 execution_environment=run_v2.ExecutionEnvironment.EXECUTION_ENVIRONMENT_GEN2,
+                vpc_access=vpc_access(settings),
             ),
         ),
     )

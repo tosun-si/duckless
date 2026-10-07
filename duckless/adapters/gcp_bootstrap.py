@@ -13,6 +13,10 @@ from duckless.core.org_policy import OrgPolicy
 SERVICE_USAGE = "https://serviceusage.googleapis.com/v1"
 IAM = "https://iam.googleapis.com/v1"
 RESOURCE_MANAGER = "https://cloudresourcemanager.googleapis.com/v3"
+COMPUTE = "https://compute.googleapis.com/compute/v1"
+SERVICE_NETWORKING = "https://servicenetworking.googleapis.com/v1"
+PSA_PEERING = "servicenetworking-googleapis-com"
+PSA_PREFIX_LENGTH = 20
 SKIPPED_PARTS = frozenset({".terraform", ".terraform.lock.hcl", "__pycache__"})
 OPERATION_POLL_SECONDS = 3
 # A service account created a moment ago can be unknown to setIamPolicy for up to a minute.
@@ -114,6 +118,43 @@ class GcpInfraBootstrap:
         response = self._session.delete(f"{IAM}/projects/{project}/serviceAccounts/{email}")
         if response.status_code != 404:
             response.raise_for_status()
+
+    def has_private_service_access(self, project: str, network: str) -> bool:
+        response = self._session.get(f"{COMPUTE}/projects/{project}/global/networks/{network}")
+        if response.status_code in (403, 404):  # Compute not enabled yet, or no such network
+            return False
+        response.raise_for_status()
+        return any(p.get("name") == PSA_PEERING for p in response.json().get("peerings", []))
+
+    def create_private_service_access(self, project: str, network: str, range_name: str) -> None:
+        network_path = f"projects/{project}/global/networks/{network}"
+        address = self._session.post(
+            f"{COMPUTE}/projects/{project}/global/addresses",
+            json={
+                "name": range_name,
+                "purpose": "VPC_PEERING",
+                "addressType": "INTERNAL",
+                "prefixLength": PSA_PREFIX_LENGTH,
+                "network": network_path,
+                "labels": {"app": "duckless"},
+            },
+        )
+        if address.status_code != 409:  # already reserved by an earlier, interrupted init
+            address.raise_for_status()
+            self._wait_compute(project, address.json())
+        operation = self._call(
+            "POST",
+            f"{SERVICE_NETWORKING}/services/servicenetworking.googleapis.com/connections",
+            json={"network": network_path, "reservedPeeringRanges": [range_name]},
+        )
+        self._wait(SERVICE_NETWORKING, operation)
+
+    def _wait_compute(self, project: str, operation: dict) -> None:
+        while operation.get("status") != "DONE":
+            time.sleep(OPERATION_POLL_SECONDS)
+            operation = self._call("GET", f"{COMPUTE}/projects/{project}/global/operations/{operation['name']}")
+        if "error" in operation:
+            raise RuntimeError(f"operation {operation['name']} failed: {operation['error']}")
 
     def delete_cloud_run_jobs(self, project: str, region: str, service_account: str) -> int:
         from google.cloud import run_v2

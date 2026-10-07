@@ -16,6 +16,7 @@ from pathlib import Path
 from duckless import service
 from duckless.core.infra import InfraRequest, InfraStatus
 from duckless.core.job import JobReport, JobRequest, JobStatus, LogLine
+from duckless.core.lake import lake_env
 from duckless.core.preflight import PreflightReport
 from duckless.settings import Settings
 
@@ -84,6 +85,7 @@ def gcp_services(settings: Settings) -> Services:
             default_image=settings.image,
             clock=lambda: datetime.now(UTC),
             nonce=lambda: uuid.uuid4().hex,
+            platform_env=lake_env(settings.lake),
         ),
         get_job=lambda job_id: service.get_job(job_id, executor=executor(), artifact_store=artifact_store()),
         job_logs=lambda job_id, since: service.job_logs(

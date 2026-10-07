@@ -15,6 +15,8 @@ from pathlib import Path
 
 import duckdb
 
+from duckless_runtime.lake import attach_sql, lake_settings, start_proxy
+
 SCRATCH_DIR = Path(os.environ.get("DUCKLESS_SCRATCH_DIR", "/mnt/disks/scratch"))
 MEMORY_FRACTION = float(os.environ.get("DUCKLESS_MEMORY_FRACTION", "0.8"))
 # gRPC measured faster than HTTP on every read/write case of the spike.
@@ -119,6 +121,14 @@ def connect(database: str = ":memory:") -> duckdb.DuckDBPyConnection:
     con = duckdb.connect(database, config={"autoinstall_known_extensions": False})
     for statement in session_sql(settings):
         con.sql(statement)
+
+    lake = lake_settings(os.environ)
+    if lake is not None:
+        proxy_seconds = start_proxy(lake)
+        con.sql("LOAD postgres")
+        con.sql("LOAD ducklake")
+        con.sql(attach_sql(lake))
+        log("ducklake_attached", alias=lake.alias, data_path=lake.data_path, proxy_seconds=round(proxy_seconds, 2))
 
     log(
         "duckdb_connected",
