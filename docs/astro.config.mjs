@@ -37,6 +37,7 @@ export default defineConfig({
 						{ label: 'Writing jobs', slug: 'guides/writing-jobs' },
 						{ label: 'Machines, Spot and spill', slug: 'guides/machines' },
 						{ label: 'DuckLake tables', slug: 'guides/ducklake' },
+						{ label: 'Agent Skills', slug: 'guides/agent-skills' },
 						{ label: 'Infrastructure', slug: 'guides/infrastructure' },
 					],
 				},

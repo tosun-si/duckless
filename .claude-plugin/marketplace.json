@@ -1,0 +1,16 @@
+{
+  "name": "duckless",
+  "owner": {
+    "name": "Mazlum Tosun"
+  },
+  "metadata": {
+    "description": "DuckLess, serverless DuckDB on GCP: Agent Skills for its users."
+  },
+  "plugins": [
+    {
+      "name": "duckless",
+      "source": "./plugin",
+      "description": "Agent Skills for DuckLess: set it up, write jobs, size machines, debug runs, use DuckLake tables."
+    }
+  ]
+}
