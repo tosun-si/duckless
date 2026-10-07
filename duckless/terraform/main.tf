@@ -6,6 +6,7 @@ locals {
     "batch.googleapis.com",
     "compute.googleapis.com",
     "logging.googleapis.com",
+    "run.googleapis.com",
     "monitoring.googleapis.com",
     "storage.googleapis.com",
   ])

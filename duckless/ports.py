@@ -42,8 +42,8 @@ class ArtifactStore(Protocol):
 
 
 class LogReader(Protocol):
-    def read(self, job_uid: str, since: datetime | None = None, limit: int = 200) -> tuple[LogLine, ...]:
-        """Runner log lines of a job, oldest first."""
+    def read(self, status: JobStatus, since: datetime | None = None, limit: int = 200) -> tuple[LogLine, ...]:
+        """Runner log lines of a job, oldest first, wherever it ran (status.executor)."""
         ...
 
 

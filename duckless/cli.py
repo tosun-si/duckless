@@ -14,6 +14,7 @@ from duckless.core.errors import DucklessError
 from duckless.core.infra import InfraRequest, InfraStatus, default_runner_tag, envrc_lines
 from duckless.core.job import JobReport, JobRequest, JobState, LogLine
 from duckless.core.preflight import PreflightReport
+from duckless.core.routing import ExecutorKind, Placement
 from duckless.settings import Settings, SettingsError
 from duckless.wiring import InfraServices, Services, cli_version, gcp_infra_services, gcp_services
 
@@ -31,6 +32,14 @@ LocalSsd = Annotated[
 Env = Annotated[list[str] | None, typer.Option("--env", "-e", help="KEY=VALUE passed to the job, repeatable")]
 MaxRun = Annotated[int, typer.Option("--max-run-seconds", help="Hard limit on the job duration")]
 Wait = Annotated[bool, typer.Option("--wait/--no-wait", help="Follow the job until it ends")]
+On = Annotated[
+    Placement,
+    typer.Option(
+        "--on",
+        help="Where to run: auto (Cloud Run Jobs when the machine fits it and no Spot or local SSD is asked, "
+        "else Cloud Batch), batch, cloudrun",
+    ),
+]
 # Accepted before or after the command name (`duckless --project p init` or `duckless init --project p`).
 Project = Annotated[str | None, typer.Option(help="GCP project (default: $DUCKLESS_PROJECT)")]
 Region = Annotated[str | None, typer.Option(help="Region (default: $DUCKLESS_REGION or europe-west1)")]
@@ -44,7 +53,7 @@ def report_lines(report: JobReport) -> list[str]:
     run = f"{status.run_seconds:.1f}s" if status.run_seconds is not None else "-"
     head = [
         f"{status.job_id}  {status.state}",
-        f"  machine {status.machine}{' (spot)' if status.spot else ''}  run {run}",
+        f"  {status.executor.value} · {status.machine}{' (spot)' if status.spot else ''}  run {run}",
     ]
     events = [f"  {e.at:%H:%M:%S}  {e.description}" for e in status.events]
     return head + events + metrics_lines(report.metrics)
@@ -172,7 +181,8 @@ def _submit(cli: CliContext, request: JobRequest, wait: bool) -> None:
     except DucklessError as e:
         typer.echo(f"error: {e}", err=True)
         raise typer.Exit(2) from e
-    typer.echo(f"submitted {status.job_id}  ({status.machine}{' spot' if status.spot else ''})")
+    where = "Cloud Run Jobs" if status.executor is ExecutorKind.CLOUD_RUN else "Cloud Batch"
+    typer.echo(f"submitted {status.job_id} on {where}  ({status.machine}{' spot' if status.spot else ''})")
     if wait:
         raise typer.Exit(_follow(services, status.job_id))
 
@@ -242,6 +252,7 @@ def run(
     env: Env = None,
     max_run_seconds: MaxRun = 3 * 3600,
     wait: Wait = True,
+    on: On = Placement.AUTO,
     project: Project = None,
     region: Region = None,
 ) -> None:
@@ -253,6 +264,7 @@ def run(
         local_ssd_count=local_ssd,
         env=parse_env(env),
         max_run_seconds=max_run_seconds,
+        placement=on,
     )
     _submit(_scoped(ctx, project, region), request, wait)
 
@@ -268,6 +280,7 @@ def exec_(
     env: Env = None,
     max_run_seconds: MaxRun = 3 * 3600,
     wait: Wait = True,
+    on: On = Placement.AUTO,
     project: Project = None,
     region: Region = None,
 ) -> None:
@@ -280,6 +293,7 @@ def exec_(
         local_ssd_count=local_ssd,
         env=parse_env(env),
         max_run_seconds=max_run_seconds,
+        placement=on,
     )
     _submit(_scoped(ctx, project, region), request, wait)
 

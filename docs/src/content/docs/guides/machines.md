@@ -3,6 +3,31 @@ title: Machines, Spot and spill
 description: Picking a machine, local SSD for spill, Spot VMs and quotas.
 ---
 
+## Cloud Batch or Cloud Run Jobs
+
+Jobs run on one of two platforms, chosen per job with `--on`:
+
+| | Cloud Batch | Cloud Run Jobs |
+| --- | --- | --- |
+| Machine | any Compute Engine machine | up to 8 vCPU and 32 GiB |
+| Local SSD for spill | yes | no (spill stays in memory) |
+| Spot | yes | no |
+| Measured start (submit to first statement) | about 1 minute | about 30 seconds |
+
+`--on auto` (the default) picks Cloud Run Jobs only when nothing changes for the job: the
+machine fits Cloud Run, and neither `--spot` nor `--local-ssd` is asked. Otherwise the job
+runs on Cloud Batch. `--on batch` and `--on cloudrun` force one or the other.
+
+```bash
+duckless run small.sql -m n2-standard-4             # fits: Cloud Run Jobs, 4 vCPU / 16 GiB
+duckless run big.sql -m n2-highmem-32 --spot        # Cloud Batch
+duckless run small.sql -m n2-standard-4 --on batch  # Cloud Batch anyway
+```
+
+On Cloud Run, DuckLess sizes the job like the machine you asked for (rounded to the CPU steps
+Cloud Run accepts: 32 GiB needs 8 vCPU), sets DuckDB's threads to those vCPUs, and reads GCS
+over HTTP: over gRPC, the first call waits about 37 seconds there before falling back.
+
 ## Picking a machine
 
 Any Compute Engine machine type works with `--machine`. For DuckDB, memory matters most, so

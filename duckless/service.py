@@ -52,8 +52,8 @@ def get_job(job_id: str, *, executor: Executor, artifact_store: ArtifactStore) -
 def job_logs(
     job_id: str, *, executor: Executor, log_reader: LogReader, since: datetime | None = None, limit: int = 200
 ) -> tuple[LogLine, ...]:
-    # Batch labels log entries with the job uid, not its id.
-    return log_reader.read(executor.get(job_id).uid, since=since, limit=limit)
+    # Log entries are labelled by platform-specific ids (Batch job uid, Cloud Run execution).
+    return log_reader.read(executor.get(job_id), since=since, limit=limit)
 
 
 def cancel_job(job_id: str, *, executor: Executor) -> None:

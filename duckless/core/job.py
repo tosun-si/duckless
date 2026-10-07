@@ -9,6 +9,7 @@ from typing import Any
 
 from duckless.core.errors import InvalidJobError
 from duckless.core.machine import MachineType, resolve_machine, validate_local_ssd_count
+from duckless.core.routing import ExecutorKind, Placement, choose_executor, cloud_run_shape
 
 MAX_JOB_ID_LENGTH = 63
 SOURCE_KINDS = {".sql": "sql", ".py": "py"}
@@ -47,6 +48,7 @@ class JobRequest:
     env: Mapping[str, str] = field(default_factory=dict)
     max_run_seconds: int = 3 * 3600
     name: str | None = None
+    placement: Placement = Placement.AUTO
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +65,7 @@ class JobSpec:
     source_uri: str | None = None
     command: tuple[str, ...] = ()
     env: tuple[tuple[str, str], ...] = ()
+    executor: ExecutorKind = ExecutorKind.BATCH
 
     def __post_init__(self) -> None:
         if not job_id_is_valid(self.job_id):
@@ -73,7 +76,11 @@ class JobSpec:
             raise InvalidJobError(f"a {self.kind} job needs a source file")
         if self.max_run_seconds <= 0:
             raise InvalidJobError("max_run_seconds must be positive")
-        validate_local_ssd_count(self.machine, self.local_ssd_count)
+        if self.executor is ExecutorKind.CLOUD_RUN:
+            if self.local_ssd_count or self.spot or cloud_run_shape(self.machine) is None:
+                raise InvalidJobError(f"{self.machine.name} with Spot or local SSD cannot run on Cloud Run Jobs")
+        else:
+            validate_local_ssd_count(self.machine, self.local_ssd_count)
 
     @property
     def runner_args(self) -> tuple[str, ...]:
@@ -97,6 +104,7 @@ class JobStatus:
     created_at: datetime
     run_seconds: float | None = None
     events: tuple[JobEvent, ...] = ()
+    executor: ExecutorKind = ExecutorKind.BATCH
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,7 +169,13 @@ def merged_env(user_env: Mapping[str, str], runner_env: Mapping[str, str]) -> tu
 def plan_job(request: JobRequest, *, default_image: str, now: datetime, nonce: str) -> JobSpec:
     """Validated spec, before the source is uploaded (its URI is a placeholder until then)."""
     kind = job_kind(request)
-    machine, local_ssd_count = resolve_machine(request.machine, request.local_ssd_count)
+    executor = choose_executor(
+        request.placement, MachineType.parse(request.machine), request.spot, request.local_ssd_count
+    )
+    if executor is ExecutorKind.CLOUD_RUN:
+        machine, local_ssd_count = MachineType.parse(request.machine), 0
+    else:
+        machine, local_ssd_count = resolve_machine(request.machine, request.local_ssd_count)
     return JobSpec(
         job_id=new_job_id(job_name(request), now, nonce),
         kind=kind,
@@ -172,4 +186,5 @@ def plan_job(request: JobRequest, *, default_image: str, now: datetime, nonce: s
         max_run_seconds=request.max_run_seconds,
         source_uri="pending-upload" if kind is not JobKind.COMMAND else None,
         command=request.command,
+        executor=executor,
     )

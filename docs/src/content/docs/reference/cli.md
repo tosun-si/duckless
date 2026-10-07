@@ -49,6 +49,7 @@ Both take:
 | `--env`, `-e` | none | `KEY=VALUE` passed to the job, repeatable |
 | `--max-run-seconds` | `10800` | hard limit on the job duration |
 | `--wait` / `--no-wait` | wait | follow the job until it ends |
+| `--on` | `auto` | `auto`, `batch` or `cloudrun`: see [Cloud Batch or Cloud Run Jobs](/duckless/guides/machines/#cloud-batch-or-cloud-run-jobs) |
 
 ### `duckless status <job-id>`
 

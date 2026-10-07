@@ -24,7 +24,7 @@ The module creates:
 | Work bucket | `<project>-duckless-work` | job sources and metrics under `runs/` (deleted after 30 days), your outputs anywhere else |
 | Service account | `duckless-runner` | identity of the job VMs |
 | Artifact Registry remote repository | `duckless-runner` | pulls the runner image from `ghcr.io` and caches it in your region |
-| APIs | Batch, Compute, Logging, Monitoring, Storage, Artifact Registry | |
+| APIs | Batch, Cloud Run, Compute, Logging, Monitoring, Storage, Artifact Registry | |
 
 ## Permissions
 
