@@ -66,7 +66,8 @@ def runtime_settings() -> RuntimeSettings:
     temp_dir, on_ssd = _temp_directory()
     return RuntimeSettings(
         memory_limit_gb=max(1, int(_total_memory_bytes() * MEMORY_FRACTION / 1024**3)),
-        threads=_cpu_count(),
+        # Set by executors that know the paid vCPUs better than the container does (Cloud Run).
+        threads=int(os.environ.get("DUCKLESS_THREADS") or _cpu_count()),
         temp_directory=str(temp_dir),
         temp_on_local_ssd=on_ssd,
         project_id=os.environ.get("GOOGLE_CLOUD_PROJECT"),

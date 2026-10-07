@@ -84,3 +84,23 @@ def resolve_machine(name: str, local_ssd_count: int | None) -> tuple[MachineType
     count = local_ssd_count if local_ssd_count is not None else default_local_ssd_count(machine)
     validate_local_ssd_count(machine, count)
     return machine, count
+
+
+# GB of memory per vCPU by machine kind, for the families DuckLess knows (others: unknown).
+_MEMORY_PER_VCPU = {
+    "standard": 4,
+    "highmem": 8,
+    "highcpu": 1,
+}
+_HIGHCPU_2GB_FAMILIES = frozenset({"c3", "c3d", "c4", "c4d", "n4"})
+_KNOWN_FAMILIES = frozenset({"n1", "n2", "n2d", "n4", "e2", "c3", "c3d", "c4", "c4d", "t2d"})
+
+
+def memory_gb(machine: MachineType) -> float | None:
+    """Memory of a predefined machine type, None when the family or kind is unknown."""
+    if machine.family not in _KNOWN_FAMILIES or machine.kind not in _MEMORY_PER_VCPU:
+        return None
+    per_vcpu = (
+        2 if machine.kind == "highcpu" and machine.family in _HIGHCPU_2GB_FAMILIES else _MEMORY_PER_VCPU[machine.kind]
+    )
+    return float(machine.vcpus * per_vcpu)

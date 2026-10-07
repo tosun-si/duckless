@@ -7,6 +7,7 @@ from duckless import service
 from duckless.core.errors import InvalidJobError, InvalidLocalSsdCountError, JobNotFoundError
 from duckless.core.job import JobKind, JobRequest, JobState, JobStatus, LogLine
 from duckless.core.quota import Quota
+from duckless.core.routing import ExecutorKind
 from tests.conftest import NOW, FakeArtifactStore, FakeExecutor, FakeLogReader, FakeQuotaReader
 
 DEFAULT_IMAGE = "europe-docker.pkg.dev/duckless/runner:0.1.0"
@@ -44,6 +45,17 @@ class TestRunJob:
         assert spec.image == DEFAULT_IMAGE
         assert spec.runner_args == ("sql", f"gs://work/runs/{status.job_id}/daily_revenue.sql")
         assert spec.spot
+
+    def test_given_machine_that_fits_cloud_run_when_running_then_submitted_on_cloud_run_without_ssd(
+        self, run: Callable[[JobRequest], JobStatus], executor: FakeExecutor, sql_file: Path
+    ) -> None:
+        # when
+        status = run(JobRequest(machine="n2-standard-8", source=sql_file))
+
+        # then
+        spec = executor.submitted[status.job_id]
+        assert spec.executor is ExecutorKind.CLOUD_RUN
+        assert spec.local_ssd_count == 0
 
     def test_given_no_local_ssd_count_when_running_then_uses_smallest_count_the_machine_accepts(
         self, run: Callable[[JobRequest], JobStatus], executor: FakeExecutor, sql_file: Path

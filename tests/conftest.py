@@ -63,8 +63,8 @@ class FakeLogReader:
     def __init__(self) -> None:
         self.lines: dict[str, tuple[LogLine, ...]] = {}
 
-    def read(self, job_uid: str, since: datetime | None = None, limit: int = 200) -> tuple[LogLine, ...]:
-        return tuple(line for line in self.lines.get(job_uid, ()) if since is None or line.at > since)[:limit]
+    def read(self, status: JobStatus, since: datetime | None = None, limit: int = 200) -> tuple[LogLine, ...]:
+        return tuple(line for line in self.lines.get(status.uid, ()) if since is None or line.at > since)[:limit]
 
 
 class FakeQuotaReader:

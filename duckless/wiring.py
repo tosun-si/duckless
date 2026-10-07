@@ -32,11 +32,25 @@ class Services:
 def gcp_services(settings: Settings) -> Services:
     @cache
     def executor():
-        from google.cloud import batch_v1
+        from duckless.core.routing import ExecutorKind
+        from duckless.executor_router import RoutingExecutor
 
-        from duckless.adapters.batch import BatchExecutor
+        def batch():
+            from google.cloud import batch_v1
 
-        return BatchExecutor(batch_v1.BatchServiceClient(), settings)
+            from duckless.adapters.batch import BatchExecutor
+
+            return BatchExecutor(batch_v1.BatchServiceClient(), settings)
+
+        def cloud_run():
+            from google.cloud import run_v2
+
+            from duckless.adapters.cloud_run import CloudRunExecutor
+
+            return CloudRunExecutor(run_v2.JobsClient(), run_v2.ExecutionsClient(), settings)
+
+        # Order matters for lookups by id: Batch first, it holds most jobs.
+        return RoutingExecutor({ExecutorKind.BATCH: batch, ExecutorKind.CLOUD_RUN: cloud_run})
 
     @cache
     def artifact_store():
