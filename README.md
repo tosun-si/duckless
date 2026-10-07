@@ -55,12 +55,16 @@ DuckLess ships a Claude Code plugin with five skills: `setup`, `writing-jobs`, `
 `troubleshooting` and `ducklake`. They carry what the docs and the CLI cannot decide for you
 (which machine, why a job failed) and the rules measured while building DuckLess.
 
+```bash
+duckless skills install          # into this project: .claude/skills + .agents/skills (--user: your home)
+```
+
+Or as a Claude Code plugin, kept up to date from this repository:
+
 ```
 /plugin marketplace add tosun-si/duckless
 /plugin install duckless@duckless
 ```
-
-Then ask your agent, or call one directly: `/duckless:sizing`.
 
 ## Layout
 
@@ -76,7 +80,7 @@ Hexagonal, kept light: a pure core, ports, adapters, and one wiring point.
 | `duckless/cli.py` | `duckless` command, a driving adapter |
 | `runtime/` | Runner image (`duckless_runtime`), published as `ghcr.io/tosun-si/duckless-runner`: DuckDB + `gcs` community extension, tuned for the VM |
 | `duckless/terraform/` | APIs, work bucket, least-privilege runner service account, Artifact Registry remote repository proxying the runner image |
-| `plugin/` | Claude Code plugin: the Agent Skills (`plugin/skills/`), listed by `.claude-plugin/marketplace.json` |
+| `duckless/plugin/` | Claude Code plugin: the Agent Skills (`duckless/plugin/skills/`), listed by `.claude-plugin/marketplace.json` |
 | `spike/` | The spike that validated the approach, kept as a record |
 
 Dependency rule: `core` imports nothing else from DuckLess, `service` only `core` and `ports`,

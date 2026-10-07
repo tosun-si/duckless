@@ -48,9 +48,9 @@ jobs:
               exit 1
             fi
           done
-          declared=$(python3 -c "import json; print(json.load(open('plugin/.claude-plugin/plugin.json'))['version'])")
+          declared=$(python3 -c "import json; print(json.load(open('duckless/plugin/.claude-plugin/plugin.json'))['version'])")
           if [ "$declared" != "$version" ]; then
-            echo "::error file=plugin/.claude-plugin/plugin.json::version $declared does not match tag $TAG"
+            echo "::error file=duckless/plugin/.claude-plugin/plugin.json::version $declared does not match tag $TAG"
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
