@@ -79,6 +79,11 @@ def infra_service_account_id(request: InfraRequest) -> str:
     return f"{request.name}-infra"
 
 
+def runner_service_account(request: InfraRequest) -> str:
+    """Created by the module (`${name}-runner`): every job of this installation runs as it."""
+    return f"{request.name}-runner@{request.project}.iam.gserviceaccount.com"
+
+
 def staging_bucket(request: InfraRequest) -> str:
     return f"{request.project}-{request.name}-infra"
 

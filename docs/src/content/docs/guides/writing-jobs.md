@@ -111,8 +111,16 @@ To get `duckless_runtime` and the DuckDB extensions in your image, build it `FRO
 runner image:
 
 ```dockerfile
-FROM ghcr.io/tosun-si/duckless-runner:0.1.1
+FROM ghcr.io/tosun-si/duckless-runner:0.2.0
 COPY --chown=app:app my_project/ ./my_project/
+```
+
+Jobs pull the image as the runner service account. For an image in another Artifact Registry
+repository, give that account read access to it, or Cloud Batch fails at the pull:
+
+```bash
+gcloud artifacts repositories add-iam-policy-binding jobs --location europe \
+  --member serviceAccount:$DUCKLESS_SA --role roles/artifactregistry.reader
 ```
 
 ## Writing to GCS fast

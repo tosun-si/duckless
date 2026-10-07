@@ -19,6 +19,7 @@ from duckless.core.infra import (
     deployment_inputs,
     infra_service_account_id,
     module_prefix,
+    runner_service_account,
     staging_bucket,
 )
 from duckless.core.job import JobReport, JobRequest, JobStatus, LogLine, merged_env, plan_job
@@ -118,7 +119,11 @@ def init_infra(
 def destroy_infra(
     request: InfraRequest, *, bootstrap: InfraBootstrap, deployer: InfraDeployer, on_step: Callable[[str], None]
 ) -> InfraStatus:
-    """Deletes the deployment, then what `init` created outside Terraform (infra SA, its grants, staging)."""
+    """Deletes the Cloud Run jobs of past runs, the deployment, then what `init` created outside
+    Terraform (infra SA, its grants, staging)."""
+    on_step("deleting the Cloud Run jobs of past runs")
+    deleted = bootstrap.delete_cloud_run_jobs(request.project, request.region, runner_service_account(request))
+    on_step(f"  {deleted} deleted")
     on_step("deleting the Infra Manager deployment (a few minutes)")
     status = deployer.destroy(request.project, request.region, deployment_id(request))
     if not status.ok:

@@ -115,6 +115,20 @@ class GcpInfraBootstrap:
         if response.status_code != 404:
             response.raise_for_status()
 
+    def delete_cloud_run_jobs(self, project: str, region: str, service_account: str) -> int:
+        from google.cloud import run_v2
+
+        client = run_v2.JobsClient()
+        jobs = [
+            job.name
+            for job in client.list_jobs(parent=f"projects/{project}/locations/{region}")
+            if job.labels.get("app") == "duckless" and job.template.template.service_account == service_account
+        ]
+        # Start every deletion, then wait: one at a time takes seconds each.
+        for operation in [client.delete_job(name=name) for name in jobs]:
+            operation.result()
+        return len(jobs)
+
     def delete_bucket(self, bucket: str) -> None:
         existing = self._storage.lookup_bucket(bucket)
         if existing is not None:

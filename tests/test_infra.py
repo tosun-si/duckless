@@ -55,6 +55,10 @@ class FakeBootstrap:
     def revoke_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> None:
         self.calls.append(f"revoke:{member}")
 
+    def delete_cloud_run_jobs(self, project: str, region: str, service_account: str) -> int:
+        self.calls.append(f"delete-cloud-run-jobs:{service_account}")
+        return 2
+
     def delete_service_account(self, project: str, email: str) -> None:
         self.calls.append(f"delete-sa:{email}")
 
@@ -154,6 +158,7 @@ class TestInitInfra:
         # then
         assert deployer.destroyed == ["duckless"]
         assert bootstrap.calls == [
+            "delete-cloud-run-jobs:duckless-runner@acme-data.iam.gserviceaccount.com",
             f"revoke:serviceAccount:{SA}",
             f"delete-sa:{SA}",
             "delete-bucket:acme-data-duckless-infra",
@@ -167,9 +172,9 @@ class TestInitInfra:
         # when
         status = service.destroy_infra(REQUEST, bootstrap=bootstrap, deployer=deployer, on_step=lambda step: None)
 
-        # then
+        # then: past runs are gone, the infra SA stays for a retry
         assert not status.ok
-        assert bootstrap.calls == []
+        assert bootstrap.calls == ["delete-cloud-run-jobs:duckless-runner@acme-data.iam.gserviceaccount.com"]
 
 
 class TestInfraRequest:

@@ -85,7 +85,8 @@ The second run updates the deployment with the module and runner image of the ne
 duckless destroy --project my-project --force
 ```
 
-`destroy` deletes the deployment (bucket, service account, repository), then the
+`destroy` deletes the Cloud Run jobs of past runs (those running as this installation's
+runner account), the deployment (bucket, service account, repository), then the
 Infrastructure Manager account, its grants and the staging bucket. `--force` is needed when
 the work bucket still holds objects. Enabled APIs stay enabled.
 
@@ -95,7 +96,7 @@ Teams that manage their infrastructure as code can use the module instead of `in
 
 ```hcl
 module "duckless" {
-  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.1.1"
+  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.2.0"
 
   project_id   = "my-project"
   region       = "europe-west1"
