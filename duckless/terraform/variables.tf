@@ -75,12 +75,6 @@ variable "network" {
   default     = "default"
 }
 
-variable "create_private_service_access" {
-  description = "Reserve a range and peer the network with Google services (private services access). `duckless init` sets it to false when the network is already peered: the peering holds one list of ranges and rewriting it would cut off the services using it."
-  type        = bool
-  default     = true
-}
-
 variable "catalog_tier" {
   description = "Cloud SQL machine tier of the catalog. It holds metadata only; db-g1-small fits most lakes."
   type        = string

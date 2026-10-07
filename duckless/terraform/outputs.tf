@@ -28,11 +28,6 @@ output "network" {
   value       = var.network
 }
 
-output "private_service_access_created" {
-  description = "Whether this module created the network peering (`duckless init` keeps managing it)."
-  value       = local.create_psa
-}
-
 output "envrc" {
   description = "Lines to paste in .envrc."
   value       = <<-EOT

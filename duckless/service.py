@@ -12,14 +12,16 @@ from pathlib import Path
 from duckless.core.errors import DucklessError
 from duckless.core.infra import (
     BOOTSTRAP_APIS,
+    CATALOG_BOOTSTRAP_APIS,
     InfraRequest,
     InfraStatus,
-    creates_private_service_access,
     deployment_id,
     deployment_inputs,
     infra_sa_roles,
     infra_service_account_id,
     module_prefix,
+    psa_cleanup_command,
+    psa_range_name,
     resolved_request,
     runner_service_account,
     staging_bucket,
@@ -102,14 +104,13 @@ def init_infra(
 
     current = deployer.get(request.project, request.region, deployment_id(request))
     request = resolved_request(request, current)
-    create_psa = False
     if request.ducklake:
-        peered = bootstrap.has_private_service_access(request.project, request.network)
-        create_psa = creates_private_service_access(current, peered)
-        on_step(
-            f"DuckLake catalog on network '{request.network}': "
-            + ("creating private services access" if create_psa else "reusing its private services access")
-        )
+        bootstrap.enable_apis(request.project, CATALOG_BOOTSTRAP_APIS)
+        if bootstrap.has_private_service_access(request.project, request.network):
+            on_step(f"DuckLake catalog: reusing the private services access of network '{request.network}'")
+        else:
+            on_step(f"DuckLake catalog: setting up private services access on network '{request.network}'")
+            bootstrap.create_private_service_access(request.project, request.network, psa_range_name(request))
 
     on_step("service account for Infra Manager")
     infra_sa = bootstrap.ensure_service_account(
@@ -133,7 +134,7 @@ def init_infra(
         request.region,
         deployment_id(request),
         source,
-        deployment_inputs(request, create_psa),
+        deployment_inputs(request),
         infra_sa,
     )
 
@@ -146,10 +147,15 @@ def destroy_infra(
     on_step("deleting the Cloud Run jobs of past runs")
     deleted = bootstrap.delete_cloud_run_jobs(request.project, request.region, runner_service_account(request))
     on_step(f"  {deleted} deleted")
+    current = deployer.get(request.project, request.region, deployment_id(request))
     on_step("deleting the Infra Manager deployment (a few minutes)")
     status = deployer.destroy(request.project, request.region, deployment_id(request))
     if not status.ok:
         return status  # keep the infra SA: it is needed to retry the deletion
+    if current and current.outputs.get("ducklake_instance"):
+        network = current.outputs.get("network", "default")
+        on_step(f"kept: the private services access of network '{network}' (other Cloud SQL instances may use it)")
+        on_step(f"  to remove it once unused: {psa_cleanup_command(request.project, network)}")
 
     on_step("removing the Infra Manager service account and the staging bucket")
     infra_sa = f"{infra_service_account_id(request)}@{request.project}.iam.gserviceaccount.com"

@@ -30,12 +30,10 @@ INFRA_SA_ROLES = (
     "roles/storage.admin",
 )
 
-# Only with DuckLake: the catalog instance, its private IP range and the network peering.
-CATALOG_INFRA_SA_ROLES = (
-    "roles/cloudsql.admin",
-    "roles/compute.networkAdmin",
-    "roles/servicenetworking.networksAdmin",
-)
+# Only with DuckLake: the catalog instance (the network peering is set up by `init` itself).
+CATALOG_INFRA_SA_ROLES = ("roles/cloudsql.admin",)
+# APIs `init` needs to set up the network's private services access before applying.
+CATALOG_BOOTSTRAP_APIS = ("compute.googleapis.com", "servicenetworking.googleapis.com")
 
 _NAME_RE = re.compile(r"^[a-z][a-z0-9-]{2,15}$")
 
@@ -116,14 +114,18 @@ def resolved_request(request: InfraRequest, current: InfraStatus | None) -> Infr
     )
 
 
-def creates_private_service_access(current: InfraStatus | None, network_peered: bool) -> bool:
-    """The module creates the peering only on a network without one, and keeps managing the
-    one it created (it is peered by then, but dropping it from the state would delete it)."""
-    created_before = bool(current and current.outputs.get("private_service_access_created"))
-    return created_before or not network_peered
+def psa_range_name(request: InfraRequest) -> str:
+    return f"{request.name}-psa"
 
 
-def deployment_inputs(request: InfraRequest, create_private_service_access: bool = False) -> dict[str, Any]:
+def psa_cleanup_command(project: str, network: str) -> str:
+    return (
+        f"gcloud services vpc-peerings delete --project {project} --network {network} "
+        "--service servicenetworking.googleapis.com"
+    )
+
+
+def deployment_inputs(request: InfraRequest) -> dict[str, Any]:
     """Terraform input values of the module (see duckless/terraform/variables.tf)."""
     return {
         "project_id": request.project,
@@ -134,7 +136,6 @@ def deployment_inputs(request: InfraRequest, create_private_service_access: bool
         "force_destroy": request.force_destroy,
         "ducklake": bool(request.ducklake),
         "network": request.network or "default",
-        "create_private_service_access": create_private_service_access,
     }
 
 

@@ -1,4 +1,7 @@
 # DuckLake catalog: Cloud SQL Postgres, private IP only, IAM authentication.
+# The network's private services access (range + peering with Google services) is set up by
+# `duckless init`, outside Terraform: it is shared with any other Cloud SQL instance of the
+# network, and the peering cannot be deleted right after the instance.
 # Jobs reach it through the Cloud SQL Auth Proxy started by the runner (--auto-iam-authn):
 # no password anywhere, the proxy refreshes the IAM token of long jobs.
 
@@ -13,7 +16,6 @@ locals {
   catalog_db    = "ducklake"
   ducklake_data = "gcss://${google_storage_bucket.work.name}/lake/"
   network_id    = "projects/${var.project_id}/global/networks/${var.network}"
-  create_psa    = var.ducklake && var.create_private_service_access
 }
 
 resource "google_project_service" "ducklake" {
@@ -22,33 +24,6 @@ resource "google_project_service" "ducklake" {
   project            = var.project_id
   service            = each.value
   disable_on_destroy = false
-}
-
-resource "google_compute_global_address" "psa" {
-  count = local.create_psa ? 1 : 0
-
-  project       = var.project_id
-  name          = "${var.name}-psa"
-  purpose       = "VPC_PEERING"
-  address_type  = "INTERNAL"
-  prefix_length = 20
-  network       = local.network_id
-  labels        = local.labels
-
-  depends_on = [google_project_service.this]
-}
-
-resource "google_service_networking_connection" "psa" {
-  count = local.create_psa ? 1 : 0
-
-  network                 = local.network_id
-  service                 = "servicenetworking.googleapis.com"
-  reserved_peering_ranges = [google_compute_global_address.psa[0].name]
-  # Deleting the peering right after the instance fails while Google releases the producer
-  # side; leaving it costs nothing and keeps `destroy` reliable.
-  deletion_policy = "ABANDON"
-
-  depends_on = [google_project_service.ducklake]
 }
 
 resource "google_sql_database_instance" "catalog" {
@@ -91,7 +66,7 @@ resource "google_sql_database_instance" "catalog" {
     }
   }
 
-  depends_on = [google_service_networking_connection.psa, google_project_service.ducklake]
+  depends_on = [google_project_service.ducklake]
 }
 
 resource "google_sql_database" "catalog" {

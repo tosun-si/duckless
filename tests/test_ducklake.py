@@ -1,13 +1,11 @@
 from dataclasses import replace
 
-import pytest
-
+from duckless import service
 from duckless.adapters.cloud_run import build_job
 from duckless.core.infra import (
     CATALOG_INFRA_SA_ROLES,
     INFRA_SA_ROLES,
     InfraStatus,
-    creates_private_service_access,
     deployment_inputs,
     resolved_request,
 )
@@ -24,13 +22,7 @@ LAKE_ENV = {
     "DUCKLESS_DUCKLAKE_DATA_PATH": "gcss://work/lake/",
 }
 LAKE_DEPLOYMENT = InfraStatus(
-    "duckless",
-    "ACTIVE",
-    {
-        "ducklake_instance": "acme:europe-west1:duckless-catalog",
-        "network": "data-vpc",
-        "private_service_access_created": True,
-    },
+    "duckless", "ACTIVE", {"ducklake_instance": "acme:europe-west1:duckless-catalog", "network": "data-vpc"}
 )
 
 
@@ -57,22 +49,6 @@ class TestResolvedRequest:
         assert request.ducklake is False
 
 
-class TestPrivateServiceAccess:
-    @pytest.mark.parametrize(
-        ("current", "peered", "creates"),
-        [
-            (None, False, True),  # new network: the module peers it
-            (None, True, False),  # already peered (e.g. other Cloud SQL): never rewrite its ranges
-            (LAKE_DEPLOYMENT, True, True),  # peered by this module earlier: keep managing it
-        ],
-    )
-    def test_given_network_state_when_deciding_then_module_only_owns_the_peering_it_created(
-        self, current: InfraStatus | None, peered: bool, creates: bool
-    ) -> None:
-        # when / then
-        assert creates_private_service_access(current, peered) is creates
-
-
 class TestInitWithDuckLake:
     def test_given_ducklake_on_a_peered_network_when_init_then_reuses_peering_and_grants_catalog_roles(self) -> None:
         # given
@@ -81,15 +57,23 @@ class TestInitWithDuckLake:
         # when
         init(bootstrap, deployer, [], replace(REQUEST, ducklake=True))
 
-        # then
+        # then: an existing peering is never touched (its range list is shared)
         inputs = deployer.applied[0][2]
-        assert (inputs["ducklake"], inputs["network"], inputs["create_private_service_access"]) == (
-            True,
-            "default",
-            False,
-        )
+        assert (inputs["ducklake"], inputs["network"]) == (True, "default")
         assert "psa?:default" in bootstrap.calls
+        assert not any(call.startswith("create-psa") for call in bootstrap.calls)
         assert set(CATALOG_INFRA_SA_ROLES) <= set(bootstrap.granted_roles)
+
+    def test_given_ducklake_on_a_network_without_peering_when_init_then_creates_it_before_applying(self) -> None:
+        # given
+        bootstrap, deployer = FakeBootstrap(network_peered=False), FakeDeployer()
+
+        # when
+        init(bootstrap, deployer, [], replace(REQUEST, ducklake=True, network="data-vpc"))
+
+        # then
+        assert "create-psa:data-vpc:duckless-psa" in bootstrap.calls
+        assert deployer.applied  # applied after the peering exists
 
     def test_given_no_ducklake_when_init_then_network_not_inspected_and_no_catalog_roles(self) -> None:
         # given
@@ -105,15 +89,23 @@ class TestInitWithDuckLake:
 
     def test_given_inputs_when_building_then_module_variables(self) -> None:
         # when
-        inputs = deployment_inputs(replace(REQUEST, ducklake=True, network="data-vpc"), True)
+        inputs = deployment_inputs(replace(REQUEST, ducklake=True, network="data-vpc"))
 
         # then
-        assert {k: inputs[k] for k in ("ducklake", "network", "create_private_service_access")} == {
-            "ducklake": True,
-            "network": "data-vpc",
-            "create_private_service_access": True,
-        }
+        assert (inputs["ducklake"], inputs["network"]) == (True, "data-vpc")
         assert set(INFRA_SA_ROLES).isdisjoint(CATALOG_INFRA_SA_ROLES)
+
+    def test_given_ducklake_deployment_when_destroying_then_keeps_peering_and_says_how_to_remove_it(self) -> None:
+        # given
+        steps: list[str] = []
+
+        # when
+        service.destroy_infra(
+            REQUEST, bootstrap=FakeBootstrap(), deployer=FakeDeployer(current=LAKE_DEPLOYMENT), on_step=steps.append
+        )
+
+        # then
+        assert any("gcloud services vpc-peerings delete" in step and "data-vpc" in step for step in steps)
 
 
 class TestLakeEnv:

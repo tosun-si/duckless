@@ -21,7 +21,7 @@ duckless init --project my-project --ducklake
 | Cloud SQL for PostgreSQL 16 | `<name>-catalog`, private IP only, IAM authentication, daily backups and 7 days of point-in-time recovery |
 | Database `ducklake` | the catalog |
 | IAM database user | the runner service account; no password exists |
-| Private services access | only if the network has none: a /20 range and the peering with Google services |
+| Private services access | only if the network has none: a /20 range (`<name>-psa`) and the peering with Google services, set up by `init` itself |
 | Runner roles | `roles/cloudsql.client`, `roles/cloudsql.instanceUser` |
 
 It takes about 10 more minutes than a plain `init` (Cloud SQL), and costs the instance:
@@ -75,6 +75,10 @@ ADC credentials.
 - **Network.** The catalog lives on the jobs' network (`--network`, default `default`). If that
   network already has private services access (for other Cloud SQL instances, for example),
   `init` reuses it and never rewrites its ranges.
+- **`destroy` keeps the private services access.** Other Cloud SQL instances of the network may
+  use it, and Google refuses to remove a peering right after an instance is deleted. `destroy`
+  prints the command to remove it once nothing uses it:
+  `gcloud services vpc-peerings delete --network <network> --service servicenetworking.googleapis.com`.
 - **Upgrades keep the catalog.** `duckless init` without `--ducklake` keeps what the
   deployment has. Removing it takes `--no-ducklake` and fails while deletion protection is on:
   only `destroy --force` turns that off.

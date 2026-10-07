@@ -66,6 +66,9 @@ class FakeBootstrap:
         self.calls.append(f"psa?:{network}")
         return self.network_peered
 
+    def create_private_service_access(self, project: str, network: str, range_name: str) -> None:
+        self.calls.append(f"create-psa:{network}:{range_name}")
+
     def delete_cloud_run_jobs(self, project: str, region: str, service_account: str) -> int:
         self.calls.append(f"delete-cloud-run-jobs:{service_account}")
         return 2
