@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tosun-si/duckless/main/assets/brand/duckless-logo-dark.svg">
-    <img alt="DuckLess" src="https://raw.githubusercontent.com/tosun-si/duckless/main/assets/brand/duckless-logo-light.svg" width="380">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tosun-si/duckless/main/assets/brand/duckless-stacked-dark.svg">
+    <img alt="DuckLess" src="https://raw.githubusercontent.com/tosun-si/duckless/main/assets/brand/duckless-stacked-light.svg" width="300">
   </picture>
 </p>
 

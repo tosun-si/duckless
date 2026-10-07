@@ -1,13 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="DuckLess">
-  <title>DuckLess</title>
-  <g fill="#F7B32B">
-    <circle cx="28" cy="68" r="15"/>
-    <circle cx="48" cy="60" r="19"/>
-    <circle cx="70" cy="68" r="15"/>
-    <rect x="28" y="68" width="42" height="15"/>
-    <circle cx="67" cy="34" r="14"/>
-    <circle cx="64" cy="46" r="10"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 944 480" role="img" aria-label="DuckLess"><title>DuckLess</title>
+  <defs>
+    <linearGradient id="speed" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#16C8FF"/><stop offset="1" stop-color="#2F7BFF"/>
+    </linearGradient>
+    <linearGradient id="back" x1="0.25" y1="0" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#22C9FF"/><stop offset="0.55" stop-color="#2A93FF"/><stop offset="1" stop-color="#2F6BFA"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0" y1="0.1" x2="0.75" y2="1">
+      <stop offset="0" stop-color="#1F74FF"/><stop offset="0.5" stop-color="#1E55F8"/><stop offset="1" stop-color="#3A2DEE"/>
+    </linearGradient>
+    <linearGradient id="feather" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2F8DFF"/><stop offset="1" stop-color="#2A5DFA"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset="0.68" stop-color="#FFFFFF"/><stop offset="1" stop-color="#D9E1FF"/>
+    </linearGradient>
+    <linearGradient id="beakTop" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#FFB41C"/><stop offset="1" stop-color="#FF9E10"/>
+    </linearGradient>
+    <linearGradient id="beakLow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FF8A0A"/><stop offset="1" stop-color="#F2640F"/>
+    </linearGradient>
+  </defs>
+
+  <!-- speed lines (the second one runs under the wing) -->
+  <g fill="url(#speed)">
+    <rect x="135" y="168" width="200" height="54" rx="27"/>
+    <rect x="18" y="254" width="420" height="52" rx="26"/>
+    <rect x="102" y="333" width="175" height="52" rx="26"/>
+    <rect x="195" y="407" width="190" height="46" rx="23"/>
   </g>
-  <path d="M79 33 h7 a5 5 0 0 1 0 10 h-9 z" fill="#E8590C"/>
-  <circle cx="70" cy="30" r="2.8" fill="#13233A"/>
+
+  <!-- back and head dome -->
+  <path d="M358 228 C 362 130, 452 28, 572 22 C 680 16, 762 80, 778 152 L 780 300 C 768 400, 700 462, 618 472 L 452 472 C 384 462, 344 404, 346 326 Z" fill="url(#back)"/>
+
+  <!-- white face and breast, crest tuft at the top left -->
+  <path d="M588 104 C 640 80, 722 86, 762 132 C 786 162, 792 212, 780 250 C 804 322, 798 422, 722 466 C 690 478, 640 480, 606 476 C 656 422, 668 342, 640 296 C 610 256, 574 206, 590 152 C 595 134, 601 121, 612 113 C 603 109, 595 106, 588 104 Z" fill="url(#face)"/>
+
+  <!-- wing: one sweep from the speed lines to the breast -->
+  <path d="M352 222 C 420 176, 540 174, 622 240 C 684 292, 692 382, 642 440 C 600 478, 470 482, 398 456 C 348 436, 322 390, 320 330 C 360 346, 402 346, 432 336 C 394 310, 362 270, 352 222 Z" fill="url(#wing)"/>
+  <path d="M418 250 C 486 222, 572 240, 616 292 C 566 272, 488 272, 432 302 C 430 284, 426 266, 418 250 Z" fill="url(#feather)" opacity="0.85"/>
+
+  <path d="M320 330 C 346 336, 380 342, 412 340 C 392 372, 392 410, 410 440 C 372 424, 334 384, 320 330 Z" fill="#2F8DFF" opacity="0.9"/>
+  <!-- wing edge: a thin highlight along the top of the wing -->
+  <path d="M352 222 C 420 176, 540 174, 622 240 C 540 190, 430 196, 352 222 Z" fill="#5DB4FF" opacity="0.55"/>
+
+  <!-- beak: light upper part, darker lower part -->
+  <path d="M748 168 C 790 148, 862 168, 918 186 C 938 194, 934 214, 908 222 C 850 236, 770 246, 712 238 C 716 208, 728 184, 748 168 Z" fill="url(#beakTop)"/>
+  <path d="M712 238 C 780 246, 870 236, 914 214 C 908 244, 862 262, 802 266 C 760 268, 728 258, 712 238 Z" fill="url(#beakLow)"/>
+  <ellipse cx="790" cy="190" rx="9" ry="4.5" fill="#E8590C" opacity="0.6"/>
+
+  <!-- eye -->
+  <circle cx="712" cy="161" r="19" fill="#0E1530"/>
 </svg>

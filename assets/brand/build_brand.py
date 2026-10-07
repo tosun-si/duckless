@@ -1,13 +1,13 @@
-"""Builds the DuckLess lockups and social image with the text converted to paths (no font needed to render).
+"""Builds the DuckLess brand files from the mark (duckless-mark.svg) with the wordmark outlined.
 
-    curl -L -o Bricolage.ttf "https://github.com/google/fonts/raw/main/ofl/bricolagegrotesque/BricolageGrotesque%5Bopsz%2Cwdth%2Cwght%5D.ttf"
+    curl -L -o Poppins-ExtraBold.ttf "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf"
     curl -L -o PlexSans.ttf "https://github.com/google/fonts/raw/main/ofl/ibmplexsans/IBMPlexSans%5Bwdth%2Cwght%5D.ttf"
-    uv run --with fonttools assets/brand/build_brand.py assets/brand   # fonts next to this script
+    uv run --with fonttools build_brand.py <fonts-dir> <out-dir>
 
-Both fonts are under the SIL Open Font License. The PNG of the social image is rendered from
-duckless-social.svg (e.g. with sharp or rsvg-convert).
+Fonts are under the SIL Open Font License; the outputs need no font to render.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -16,77 +16,102 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
-HERE = Path(__file__).parent
-OUT = Path(sys.argv[1])
+FONTS, OUT = Path(sys.argv[1]), Path(sys.argv[2])
+MARK_SVG = (OUT / "duckless-mark.svg").read_text()
+MARK_DEFS = re.search(r"<defs>(.*?)</defs>", MARK_SVG, re.S).group(1)
+MARK_BODY = re.sub(r"<defs>.*?</defs>", "", MARK_SVG.split(">", 1)[1].rsplit("</svg>", 1)[0], flags=re.S)
+MARK_W, MARK_H = 944, 480
 
-AMBER, BEAK, INK, PAPER = "#F7B32B", "#E8590C", "#13233A", "#F2F4F8"
-MARK = (
-    f'<g fill="{AMBER}"><circle cx="28" cy="68" r="15"/><circle cx="48" cy="60" r="19"/>'
-    f'<circle cx="70" cy="68" r="15"/><rect x="28" y="68" width="42" height="15"/>'
-    f'<circle cx="67" cy="34" r="14"/><circle cx="64" cy="46" r="10"/></g>'
-    f'<path d="M79 33 h7 a5 5 0 0 1 0 10 h-9 z" fill="{BEAK}"/>'
-    f'<circle cx="70" cy="30" r="2.8" fill="{INK}"/>'
+INK, PAPER, NIGHT = "#0B1530", "#F2F4F8", "#0B1530"
+LESS_GRADIENT = (
+    '<linearGradient id="less" x1="0" y1="0" x2="1" y2="1">'
+    '<stop offset="0" stop-color="#0EA5FF"/><stop offset="1" stop-color="#4338F5"/></linearGradient>'
 )
 
 
-def instance(path: Path, **axes: float) -> TTFont:
-    font = TTFont(path)
-    return instantiateVariableFont(font, axes) if "fvar" in font else font
+def font(path: Path, **axes: float) -> TTFont:
+    f = TTFont(path)
+    return instantiateVariableFont(f, axes) if "fvar" in f else f
 
 
-def text_path(
-    font: TTFont, text: str, size: float, x: float, baseline: float, tracking: float = 0
-) -> tuple[str, float]:
-    """SVG path data of `text` (baseline at y), and its advance width."""
-    glyph_set, cmap = font.getGlyphSet(), font.getBestCmap()
-    scale = size / font["head"].unitsPerEm
-    pen = SVGPathPen(glyph_set)
-    cursor = x
+def text_path(f: TTFont, text: str, size: float, x: float, baseline: float, tracking: float = 0) -> tuple[str, float]:
+    glyphs, cmap = f.getGlyphSet(), f.getBestCmap()
+    scale = size / f["head"].unitsPerEm
+    pen, cursor = SVGPathPen(glyphs), x
     for char in text:
         name = cmap[ord(char)]
-        glyph_set[name].draw(TransformPen(pen, (scale, 0, 0, -scale, cursor, baseline)))
-        cursor += glyph_set[name].width * scale + tracking
+        glyphs[name].draw(TransformPen(pen, (scale, 0, 0, -scale, cursor, baseline)))
+        cursor += glyphs[name].width * scale + tracking
     return pen.getCommands(), cursor - x - tracking
 
 
-bold = instance(HERE / "Bricolage.ttf", wght=800, opsz=96, wdth=100)
-regular = instance(HERE / "PlexSans.ttf", wght=400, wdth=100)
+def mark(x: float, y: float, width: float, view: str = f"0 0 {MARK_W} {MARK_H}") -> str:
+    vw, vh = (float(v) for v in view.split()[2:])
+    return f'<svg x="{x}" y="{y}" width="{width}" height="{width * vh / vw:.1f}" viewBox="{view}">{MARK_BODY}</svg>'
 
 
-def lockup(duck_color: str) -> str:
-    """Mark + wordmark, 1 line, viewBox fitted to the content."""
-    mark_size, gap, size = 120, 18, 92
-    baseline = 98
-    duck, w_duck = text_path(bold, "Duck", size, mark_size + gap, baseline, tracking=-1.5)
-    less, w_less = text_path(bold, "Less", size, mark_size + gap + w_duck - 1.5, baseline, tracking=-1.5)
-    width = mark_size + gap + w_duck + w_less + 6
+bold = font(FONTS / "Poppins-ExtraBold.ttf")
+regular = font(FONTS / "PlexSans.ttf", wght=400, wdth=100)
+
+
+def wordmark(x: float, baseline: float, size: float, duck_color: str) -> tuple[str, float]:
+    duck, w_duck = text_path(bold, "Duck", size, x, baseline, tracking=-size * 0.02)
+    less, w_less = text_path(bold, "Less", size, x + w_duck - size * 0.02, baseline, tracking=-size * 0.02)
+    return f'<path d="{duck}" fill="{duck_color}"/><path d="{less}" fill="url(#less)"/>', w_duck + w_less
+
+
+def horizontal(duck_color: str) -> str:
+    """Mark on the left, wordmark on the right: site header, wide spaces."""
+    mark_w = 250
+    words, width = wordmark(mark_w + 16, 92, 96, duck_color)
+    total = mark_w + 16 + width + 6
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} 128" role="img" aria-label="DuckLess">'
-        f"<title>DuckLess</title>"
-        f'<svg x="0" y="4" width="{mark_size}" height="{mark_size}" viewBox="0 0 100 100">{MARK}</svg>'
-        f'<path d="{duck}" fill="{duck_color}"/><path d="{less}" fill="{AMBER}"/></svg>'
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {total:.0f} 128" role="img" aria-label="DuckLess">'
+        f"<title>DuckLess</title><defs>{MARK_DEFS}{LESS_GRADIENT}</defs>"
+        f"{mark(0, 0, mark_w)}{words}</svg>"
+    )
+
+
+def stacked(duck_color: str) -> str:
+    """Mark above the wordmark, as in the original artwork: README hero."""
+    size, mark_w = 150, 560
+    _, words_w = wordmark(0, 0, size, duck_color)
+    width = max(mark_w, words_w) + 24
+    words, _ = wordmark((width - words_w) / 2, 470, size, duck_color)
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} 500" role="img" aria-label="DuckLess">'
+        f"<title>DuckLess</title><defs>{MARK_DEFS}{LESS_GRADIENT}</defs>"
+        f"{mark((width - mark_w) / 2, 0, mark_w)}{words}</svg>"
+    )
+
+
+def icon() -> str:
+    """The duck without its speed lines, square: favicon and avatars, where the lines would be noise."""
+    body = re.sub(r'<g fill="url\(#speed\)">.*?</g>', "", MARK_BODY, flags=re.S)
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="296 -76 652 652" role="img" aria-label="DuckLess">'
+        f"<title>DuckLess</title><defs>{MARK_DEFS}</defs>{body}</svg>"
     )
 
 
 def social() -> str:
-    """1280x640 card for link previews (GitHub social preview, Open Graph)."""
-    left = 520
-    duck, w_duck = text_path(bold, "Duck", 116, left, 300, tracking=-2)
-    less, _ = text_path(bold, "Less", 116, left + w_duck - 2, 300, tracking=-2)
-    tag, _ = text_path(regular, "Serverless DuckDB on Google Cloud", 40, left + 4, 372)
-    sub1, _ = text_path(regular, "Big VMs, only for the time of the job.", 27, left + 4, 432)
-    sub2, _ = text_path(regular, "In your project, no HMAC keys.", 27, left + 4, 470)
+    left = 600
+    words, _ = wordmark(left, 300, 118, PAPER)
+    tag, _ = text_path(regular, "Serverless DuckDB on Google Cloud", 38, left + 4, 370)
+    sub1, _ = text_path(regular, "Big VMs, only for the time of the job.", 26, left + 4, 430)
+    sub2, _ = text_path(regular, "In your project, no HMAC keys.", 26, left + 4, 467)
     return (
         '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">'
-        f'<rect width="1280" height="640" fill="{INK}"/>'
-        f'<svg x="110" y="140" width="360" height="360" viewBox="0 0 100 100">{MARK}</svg>'
-        f'<path d="{duck}" fill="{PAPER}"/><path d="{less}" fill="{AMBER}"/>'
-        f'<path d="{tag}" fill="#C9D2E0"/><path d="{sub1}" fill="#8A97AD"/><path d="{sub2}" fill="#8A97AD"/>'
-        "</svg>"
+        f"<defs>{MARK_DEFS}{LESS_GRADIENT}</defs>"
+        f'<rect width="1280" height="640" fill="{NIGHT}"/>{mark(40, 205, 520)}{words}'
+        f'<path d="{tag}" fill="#C9D2E0"/><path d="{sub1}" fill="#8A97AD"/><path d="{sub2}" fill="#8A97AD"/></svg>'
     )
 
 
-(OUT / "duckless-logo-light.svg").write_text(lockup(INK))  # for light backgrounds
-(OUT / "duckless-logo-dark.svg").write_text(lockup(PAPER))  # for dark backgrounds
+(OUT / "duckless-logo-light.svg").write_text(horizontal(INK))
+(OUT / "duckless-logo-dark.svg").write_text(horizontal(PAPER))
+(OUT / "duckless-stacked-light.svg").write_text(stacked(INK))
+(OUT / "duckless-stacked-dark.svg").write_text(stacked(PAPER))
+(OUT / "duckless-icon.svg").write_text(icon())
 (OUT / "duckless-social.svg").write_text(social())
 print("written to", OUT)
