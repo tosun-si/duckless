@@ -6,7 +6,7 @@ account, from a copy uploaded to a staging bucket: the module version is always 
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from duckless.core.errors import DucklessError
@@ -30,6 +30,13 @@ INFRA_SA_ROLES = (
     "roles/storage.admin",
 )
 
+# Only with DuckLake: the catalog instance, its private IP range and the network peering.
+CATALOG_INFRA_SA_ROLES = (
+    "roles/cloudsql.admin",
+    "roles/compute.networkAdmin",
+    "roles/servicenetworking.networksAdmin",
+)
+
 _NAME_RE = re.compile(r"^[a-z][a-z0-9-]{2,15}$")
 
 
@@ -45,6 +52,8 @@ class InfraRequest:
     data_buckets: tuple[str, ...] = ()
     runner_image_tag: str = "edge"
     force_destroy: bool = False
+    ducklake: bool | None = None  # None: keep what the deployment has (off for a new one)
+    network: str | None = None  # None: keep what the deployment has ("default" for a new one)
 
     def __post_init__(self) -> None:
         if not self.project or not self.region:
@@ -92,7 +101,29 @@ def module_prefix(version: str) -> str:
     return f"module/{version}"
 
 
-def deployment_inputs(request: InfraRequest) -> dict[str, Any]:
+def infra_sa_roles(ducklake: bool) -> tuple[str, ...]:
+    return INFRA_SA_ROLES + (CATALOG_INFRA_SA_ROLES if ducklake else ())
+
+
+def resolved_request(request: InfraRequest, current: InfraStatus | None) -> InfraRequest:
+    """Options left unset keep the deployment's values: an upgrade or `destroy --force` without
+    --ducklake must not plan the catalog's deletion."""
+    outputs = current.outputs if current else {}
+    return replace(
+        request,
+        ducklake=request.ducklake if request.ducklake is not None else bool(outputs.get("ducklake_instance")),
+        network=request.network or outputs.get("network") or "default",
+    )
+
+
+def creates_private_service_access(current: InfraStatus | None, network_peered: bool) -> bool:
+    """The module creates the peering only on a network without one, and keeps managing the
+    one it created (it is peered by then, but dropping it from the state would delete it)."""
+    created_before = bool(current and current.outputs.get("private_service_access_created"))
+    return created_before or not network_peered
+
+
+def deployment_inputs(request: InfraRequest, create_private_service_access: bool = False) -> dict[str, Any]:
     """Terraform input values of the module (see duckless/terraform/variables.tf)."""
     return {
         "project_id": request.project,
@@ -101,6 +132,9 @@ def deployment_inputs(request: InfraRequest) -> dict[str, Any]:
         "data_buckets": list(request.data_buckets),
         "runner_image_tag": request.runner_image_tag,
         "force_destroy": request.force_destroy,
+        "ducklake": bool(request.ducklake),
+        "network": request.network or "default",
+        "create_private_service_access": create_private_service_access,
     }
 
 

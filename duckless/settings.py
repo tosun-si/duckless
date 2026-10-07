@@ -3,6 +3,8 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 
+from duckless.core.lake import LakeConfig
+
 REQUIRED = {
     "project": "DUCKLESS_PROJECT",
     "bucket": "DUCKLESS_BUCKET",
@@ -26,6 +28,14 @@ class Settings:
     network: str
     subnetwork: str
     external_ip: bool = False
+    ducklake_instance: str = ""
+    ducklake_data_path: str = ""
+
+    @property
+    def lake(self) -> LakeConfig | None:
+        if not self.ducklake_instance:
+            return None
+        return LakeConfig(self.ducklake_instance, self.ducklake_data_path, self.service_account)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str], **overrides: str | None) -> "Settings":
@@ -41,7 +51,12 @@ class Settings:
         missing = tuple(var for field, var in REQUIRED.items() if not values[field])
         if missing:
             raise SettingsError(missing)
-        settings = cls(**values, external_ip=env.get("DUCKLESS_EXTERNAL_IP", "false").lower() == "true")
+        settings = cls(
+            **values,
+            external_ip=env.get("DUCKLESS_EXTERNAL_IP", "false").lower() == "true",
+            ducklake_instance=env.get("DUCKLESS_DUCKLAKE_INSTANCE", ""),
+            ducklake_data_path=env.get("DUCKLESS_DUCKLAKE_DATA_PATH", ""),
+        )
         return replace(
             settings,
             network=network_path(settings.project, settings.network),

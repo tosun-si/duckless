@@ -4,7 +4,7 @@ Each function takes the ports it needs as keyword arguments; duckless.wiring bin
 the GCP adapters. Rules stay in duckless.core, side effects go through the ports.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -12,13 +12,15 @@ from pathlib import Path
 from duckless.core.errors import DucklessError
 from duckless.core.infra import (
     BOOTSTRAP_APIS,
-    INFRA_SA_ROLES,
     InfraRequest,
     InfraStatus,
+    creates_private_service_access,
     deployment_id,
     deployment_inputs,
+    infra_sa_roles,
     infra_service_account_id,
     module_prefix,
+    resolved_request,
     runner_service_account,
     staging_bucket,
 )
@@ -37,11 +39,12 @@ def run_job(
     default_image: str,
     clock: Callable[[], datetime],
     nonce: Callable[[], str],
+    platform_env: Mapping[str, str] | None = None,
 ) -> JobStatus:
     # Everything that can be rejected is rejected before the upload.
     draft = plan_job(request, default_image=default_image, now=clock(), nonce=nonce())
     source_uri = artifact_store.upload_source(draft.job_id, request.source) if request.source else None
-    env = merged_env(request.env, artifact_store.runner_env(draft.job_id))
+    env = merged_env(request.env, {**(platform_env or {}), **artifact_store.runner_env(draft.job_id)})
     return executor.submit(replace(draft, source_uri=source_uri, env=env))
 
 
@@ -97,11 +100,22 @@ def init_infra(
             deployment_id(request), "BLOCKED", error="\n".join(f"{c.name}: {c.detail}" for c in blocking)
         )
 
+    current = deployer.get(request.project, request.region, deployment_id(request))
+    request = resolved_request(request, current)
+    create_psa = False
+    if request.ducklake:
+        peered = bootstrap.has_private_service_access(request.project, request.network)
+        create_psa = creates_private_service_access(current, peered)
+        on_step(
+            f"DuckLake catalog on network '{request.network}': "
+            + ("creating private services access" if create_psa else "reusing its private services access")
+        )
+
     on_step("service account for Infra Manager")
     infra_sa = bootstrap.ensure_service_account(
         request.project, infra_service_account_id(request), "DuckLess infra (Infrastructure Manager)"
     )
-    if bootstrap.grant_project_roles(request.project, f"serviceAccount:{infra_sa}", INFRA_SA_ROLES):
+    if bootstrap.grant_project_roles(request.project, f"serviceAccount:{infra_sa}", infra_sa_roles(request.ducklake)):
         on_step("waiting for the new IAM grants to propagate")
         wait_for_iam()
 
@@ -110,9 +124,17 @@ def init_infra(
     bootstrap.ensure_bucket(request.project, request.region, bucket)
     source = bootstrap.upload_directory(module_dir, bucket, module_prefix(version))
 
-    on_step("applying with Infrastructure Manager (a few minutes)")
+    on_step(
+        "applying with Infrastructure Manager (a few minutes"
+        + (", ~10 more for Cloud SQL)" if request.ducklake else ")")
+    )
     return deployer.apply(
-        request.project, request.region, deployment_id(request), source, deployment_inputs(request), infra_sa
+        request.project,
+        request.region,
+        deployment_id(request),
+        source,
+        deployment_inputs(request, create_psa),
+        infra_sa,
     )
 
 
@@ -131,7 +153,7 @@ def destroy_infra(
 
     on_step("removing the Infra Manager service account and the staging bucket")
     infra_sa = f"{infra_service_account_id(request)}@{request.project}.iam.gserviceaccount.com"
-    bootstrap.revoke_project_roles(request.project, f"serviceAccount:{infra_sa}", INFRA_SA_ROLES)
+    bootstrap.revoke_project_roles(request.project, f"serviceAccount:{infra_sa}", infra_sa_roles(ducklake=True))
     bootstrap.delete_service_account(request.project, infra_sa)
     bootstrap.delete_bucket(staging_bucket(request))
     return status

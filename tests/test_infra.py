@@ -26,8 +26,14 @@ SA = "duckless-infra@acme-data.iam.gserviceaccount.com"
 
 
 class FakeBootstrap:
-    def __init__(self, policy_changes: bool = True, org_policies: dict[str, OrgPolicy] | None = None) -> None:
+    def __init__(
+        self,
+        policy_changes: bool = True,
+        org_policies: dict[str, OrgPolicy] | None = None,
+        network_peered: bool = False,
+    ) -> None:
         self.calls: list[str] = []
+        self.network_peered = network_peered
         self.policy_changes = policy_changes
         self.org_policies = org_policies or {}
 
@@ -43,6 +49,7 @@ class FakeBootstrap:
 
     def grant_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> bool:
         self.calls.append(f"grant:{member}")
+        self.granted_roles = roles
         return self.policy_changes
 
     def ensure_bucket(self, project: str, region: str, bucket: str) -> None:
@@ -54,6 +61,10 @@ class FakeBootstrap:
 
     def revoke_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> None:
         self.calls.append(f"revoke:{member}")
+
+    def has_private_service_access(self, project: str, network: str) -> bool:
+        self.calls.append(f"psa?:{network}")
+        return self.network_peered
 
     def delete_cloud_run_jobs(self, project: str, region: str, service_account: str) -> int:
         self.calls.append(f"delete-cloud-run-jobs:{service_account}")
@@ -67,7 +78,8 @@ class FakeBootstrap:
 
 
 class FakeDeployer:
-    def __init__(self, destroy_error: str | None = None) -> None:
+    def __init__(self, destroy_error: str | None = None, current: InfraStatus | None = None) -> None:
+        self.current = current
         self.applied: list[tuple[str, str, Mapping[str, Any], str]] = []
         self.destroyed: list[str] = []
         self.destroy_error = destroy_error
@@ -77,7 +89,7 @@ class FakeDeployer:
         return InfraStatus(deployment_id, "ACTIVE", {"envrc": "export DUCKLESS_PROJECT=acme-data\n"})
 
     def get(self, project, region, deployment_id) -> InfraStatus | None:
-        return None
+        return self.current
 
     def destroy(self, project, region, deployment_id) -> InfraStatus:
         self.destroyed.append(deployment_id)
@@ -86,9 +98,11 @@ class FakeDeployer:
         return InfraStatus(deployment_id, "DELETED")
 
 
-def init(bootstrap: FakeBootstrap, deployer: FakeDeployer, waits: list[int]) -> InfraStatus:
+def init(
+    bootstrap: FakeBootstrap, deployer: FakeDeployer, waits: list[int], request: InfraRequest = REQUEST
+) -> InfraStatus:
     return service.init_infra(
-        REQUEST,
+        request,
         bootstrap=bootstrap,
         deployer=deployer,
         module_dir=Path("unused"),

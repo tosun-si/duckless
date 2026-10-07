@@ -18,6 +18,8 @@ Deploys or upgrades DuckLess in a project with Infrastructure Manager and prints
 | `--data-bucket` | none | bucket jobs may read and write, repeatable |
 | `--runner-tag` | the CLI version | runner image tag (`edge` for dev builds) |
 | `--name` | `duckless` | prefix of the created resources |
+| `--ducklake` / `--no-ducklake` | the deployment's (off for a new one) | DuckLake catalog on Cloud SQL, see [DuckLake tables](/duckless/guides/ducklake/) |
+| `--network` | the deployment's (`default` for a new one) | VPC network of the jobs and of the catalog's private IP |
 
 ### `duckless destroy`
 
@@ -26,7 +28,7 @@ Deletes what `init` created.
 | Option | Default | |
 | --- | --- | --- |
 | `--name` | `duckless` | prefix given to `init` |
-| `--force` | off | also delete a work bucket that still holds objects |
+| `--force` | off | also delete a work bucket that still holds objects, and the DuckLake catalog |
 | `--yes` | off | do not ask for confirmation |
 
 ## Jobs

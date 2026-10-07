@@ -1,0 +1,80 @@
+---
+title: DuckLake tables
+description: Tables with snapshots, time travel and concurrent writers, stored as Parquet on GCS with a Cloud SQL catalog.
+---
+
+[DuckLake](https://ducklake.select) turns Parquet files on GCS into tables: `INSERT`,
+`UPDATE`, `DELETE`, snapshots and time travel, with several jobs writing at once. The data
+stays Parquet in your bucket; a Postgres database keeps the catalog (which files make which
+table version).
+
+## Turn it on
+
+```bash
+duckless init --project my-project --ducklake
+```
+
+`init` adds to the installation:
+
+| Resource | Details |
+| --- | --- |
+| Cloud SQL for PostgreSQL 16 | `<name>-catalog`, private IP only, IAM authentication, daily backups and 7 days of point-in-time recovery |
+| Database `ducklake` | the catalog |
+| IAM database user | the runner service account; no password exists |
+| Private services access | only if the network has none: a /20 range and the peering with Google services |
+| Runner roles | `roles/cloudsql.client`, `roles/cloudsql.instanceUser` |
+
+It takes about 10 more minutes than a plain `init` (Cloud SQL), and costs the instance:
+`db-g1-small` by default, about $25 a month. Add the two lines `init` prints to `.envrc`:
+
+```bash
+export DUCKLESS_DUCKLAKE_INSTANCE=my-project:europe-west1:duckless-catalog
+export DUCKLESS_DUCKLAKE_DATA_PATH=gcss://my-project-duckless-work/lake/
+```
+
+## Use it
+
+Every job then starts with the catalog attached as `lake`:
+
+```sql
+CREATE TABLE lake.orders AS SELECT * FROM read_parquet('gs://my-data/orders/*.parquet');
+
+INSERT INTO lake.orders SELECT * FROM read_parquet('gs://my-data/orders_today/*.parquet');
+
+SELECT count(*) FROM lake.orders AT (VERSION => 3);   -- time travel
+SELECT * FROM ducklake_snapshots('lake');              -- history
+```
+
+In Python, `duckless_runtime.connect()` returns a connection with `lake` attached.
+
+Jobs run on Cloud Batch or Cloud Run Jobs alike: Cloud Run jobs get Direct VPC egress to the
+catalog's private IP (private ranges only; Google APIs keep their usual path).
+
+## How it connects
+
+The runner starts the [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy)
+next to DuckDB with automatic IAM authentication. The proxy logs in as the runner service
+account and refreshes its token, so:
+
+- no password is stored, passed or logged anywhere;
+- jobs longer than an hour keep working (the IAM token lives one hour; DuckLake opens new
+  catalog connections all along the job). This was checked with 80-minute jobs on both runners.
+
+The data path is `gcss://`, not `gs://`: DuckLake hands `gs://` paths to the `httpfs`
+extension, which the runner does not ship, while `gcss://` goes to the `gcs` extension and its
+ADC credentials.
+
+## Good to know
+
+- **The catalog is the lake.** Without it, the Parquet files are files, not tables. Backups and
+  point-in-time recovery are on; `duckless destroy` refuses to delete the instance without
+  `--force`.
+- **The runner is `cloudsqlsuperuser` on the catalog instance.** The instance holds only this
+  catalog, and the runner already owns the lake's files on GCS. Grants on one database cannot be
+  set from Terraform here (no public IP, so no SQL session from Infrastructure Manager).
+- **Network.** The catalog lives on the jobs' network (`--network`, default `default`). If that
+  network already has private services access (for other Cloud SQL instances, for example),
+  `init` reuses it and never rewrites its ranges.
+- **Upgrades keep the catalog.** `duckless init` without `--ducklake` keeps what the
+  deployment has. Removing it takes `--no-ducklake` and fails while deletion protection is on:
+  only `destroy --force` turns that off.

@@ -19,6 +19,9 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable
 
+# ---------- Cloud SQL Auth Proxy (DuckLake catalog) ----------
+FROM gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.26.0 AS proxy
+
 # ---------- runtime (no uv) ----------
 FROM python:3.13-slim-bookworm AS runtime
 ARG APP_DIR
@@ -34,13 +37,14 @@ RUN groupadd --system app \
  && chown app:app ${APP_DIR}
 
 COPY --from=builder --chown=app:app ${APP_DIR}/.venv ${APP_DIR}/.venv
+COPY --from=proxy /cloud-sql-proxy /usr/local/bin/cloud-sql-proxy
 COPY --chown=app:app smoke_test.py ./
 
 USER app
 
 # Extensions baked in (~/.duckdb/extensions): VMs have no external IP, and
 # httpfs is deliberately absent so gs:// is always served by the gcs extension.
-RUN python -c "import duckdb; c = duckdb.connect(); c.sql('INSTALL gcs FROM community'); c.sql('INSTALL tpch')"
+RUN python -c "import duckdb; c = duckdb.connect(); [c.sql(s) for s in ('INSTALL gcs FROM community', 'INSTALL tpch', 'INSTALL ducklake', 'INSTALL postgres')]"
 
 ENTRYPOINT ["python", "-m", "duckless_runtime"]
 CMD ["--help"]

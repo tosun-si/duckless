@@ -18,6 +18,8 @@ description: Environment variables read by the CLI and by the runner.
 | `DUCKLESS_NETWORK` | no | network of the job VMs, default `default` |
 | `DUCKLESS_SUBNETWORK` | no | subnetwork, default `default`; a full path for Shared VPC |
 | `DUCKLESS_EXTERNAL_IP` | no | `true` to give job VMs an external IP (not needed with Private Google Access) |
+| `DUCKLESS_DUCKLAKE_INSTANCE` | no | DuckLake catalog (Cloud SQL connection name); jobs attach it as `lake` |
+| `DUCKLESS_DUCKLAKE_DATA_PATH` | with the catalog | where DuckLake writes table files, `gcss://<bucket>/lake/` |
 
 ## Runner
 
@@ -28,6 +30,7 @@ Set for every job, readable from SQL (`${VAR}`) and Python (`os.environ`):
 | `DUCKLESS_JOB_ID` | the job id |
 | `DUCKLESS_BUCKET` | the work bucket |
 | `DUCKLESS_METRICS_URI` | where the runner writes its metrics |
+| `DUCKLESS_DUCKLAKE_INSTANCE`, `_DATA_PATH`, `_USER` | the catalog to attach, when the installation has one |
 | `GOOGLE_CLOUD_PROJECT` | the project |
 
 Settings you can pass with `--env`:

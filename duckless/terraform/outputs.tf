@@ -13,6 +13,26 @@ output "runner_image" {
   value       = local.runner_image
 }
 
+output "ducklake_instance" {
+  description = "DUCKLESS_DUCKLAKE_INSTANCE: connection name of the catalog (empty without DuckLake)."
+  value       = var.ducklake ? google_sql_database_instance.catalog[0].connection_name : ""
+}
+
+output "ducklake_data_path" {
+  description = "DUCKLESS_DUCKLAKE_DATA_PATH: where DuckLake writes the tables' Parquet files."
+  value       = var.ducklake ? local.ducklake_data : ""
+}
+
+output "network" {
+  description = "VPC network of the jobs (and of the catalog's private IP)."
+  value       = var.network
+}
+
+output "private_service_access_created" {
+  description = "Whether this module created the network peering (`duckless init` keeps managing it)."
+  value       = local.create_psa
+}
+
 output "envrc" {
   description = "Lines to paste in .envrc."
   value       = <<-EOT
@@ -21,5 +41,10 @@ output "envrc" {
     export DUCKLESS_BUCKET=${google_storage_bucket.work.name}
     export DUCKLESS_SA=${google_service_account.runner.email}
     export DUCKLESS_IMAGE=${local.runner_image}
+    export DUCKLESS_NETWORK=${var.network}
+  %{~if var.ducklake}
+    export DUCKLESS_DUCKLAKE_INSTANCE=${google_sql_database_instance.catalog[0].connection_name}
+    export DUCKLESS_DUCKLAKE_DATA_PATH=${local.ducklake_data}
+  %{~endif}
   EOT
 }
