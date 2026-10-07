@@ -15,6 +15,12 @@ IAM = "https://iam.googleapis.com/v1"
 RESOURCE_MANAGER = "https://cloudresourcemanager.googleapis.com/v3"
 SKIPPED_PARTS = frozenset({".terraform", ".terraform.lock.hcl", "__pycache__"})
 OPERATION_POLL_SECONDS = 3
+# A service account created a moment ago can be unknown to setIamPolicy for up to a minute.
+NEW_MEMBER_DELAYS = (2, 4, 8, 15, 30)
+
+
+def is_unknown_member(status_code: int, body: str) -> bool:
+    return status_code == 400 and "does not exist" in body
 
 
 def module_files(local_dir: Path) -> list[Path]:
@@ -87,10 +93,16 @@ class GcpInfraBootstrap:
         resource = f"{RESOURCE_MANAGER}/projects/{project}"
         policy = self._call("POST", f"{resource}:getIamPolicy", json={"options": {"requestedPolicyVersion": 3}})
         updated, changed = change(policy)
-        if changed:
+        if not changed:
+            return False
+        for delay in (*NEW_MEMBER_DELAYS, None):
             # The etag in `updated` makes a concurrent change fail instead of being overwritten.
-            self._call("POST", f"{resource}:setIamPolicy", json={"policy": updated})
-        return changed
+            response = self._session.post(f"{resource}:setIamPolicy", json={"policy": updated})
+            if delay is None or not is_unknown_member(response.status_code, response.text):
+                break
+            time.sleep(delay)
+        response.raise_for_status()
+        return True
 
     def grant_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> bool:
         return self._update_policy(project, lambda policy: with_bindings(policy, member, roles))
