@@ -80,6 +80,10 @@ class InfraBootstrap(Protocol):
         """No-op when it does not exist."""
         ...
 
+    def delete_cloud_run_jobs(self, project: str, region: str, service_account: str) -> int:
+        """DuckLess Cloud Run jobs (one per run) running as this service account; returns how many."""
+        ...
+
     def delete_bucket(self, bucket: str) -> None:
         """Deletes its objects too; no-op when it does not exist."""
         ...
