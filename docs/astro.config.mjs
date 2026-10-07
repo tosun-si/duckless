@@ -9,6 +9,15 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'DuckLess',
+			logo: {
+				light: './src/assets/duckless-logo-light.svg',
+				dark: './src/assets/duckless-logo-dark.svg',
+				replacesTitle: true,
+			},
+			head: [
+				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://tosun-si.github.io/duckless/duckless-social.png' } },
+				{ tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+			],
 			description:
 				'Serverless DuckDB on Google Cloud: run SQL or your own code on a right-sized VM in your project, then tear it down.',
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/tosun-si/duckless' }],

@@ -1,4 +1,15 @@
-# DuckLess
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/tosun-si/duckless/main/assets/brand/duckless-logo-dark.svg">
+    <img alt="DuckLess" src="https://raw.githubusercontent.com/tosun-si/duckless/main/assets/brand/duckless-logo-light.svg" width="380">
+  </picture>
+</p>
+
+<p align="center">
+  <a href="https://pypi.org/project/duckless/"><img alt="PyPI" src="https://img.shields.io/pypi/v/duckless?color=F7B32B&labelColor=13233A"></a>
+  <a href="https://tosun-si.github.io/duckless/"><img alt="Docs" src="https://img.shields.io/badge/docs-tosun--si.github.io%2Fduckless-F7B32B?labelColor=13233A"></a>
+  <a href="https://github.com/tosun-si/duckless/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-F7B32B?labelColor=13233A"></a>
+</p>
 
 Serverless DuckDB on GCP. Submit SQL or your own code; DuckLess runs it on a right-sized
 Compute Engine VM (Cloud Batch) **in your project**, reads and writes GCS through ADC
