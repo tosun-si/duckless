@@ -84,3 +84,15 @@ Checks a machine choice against Compute Engine rules and the region's quotas. Ta
 | 0 | success |
 | 1 | the job (or the deployment) failed, or `preflight` is blocked |
 | 2 | invalid input or missing settings |
+
+## Skills
+
+### `duckless skills install`
+
+Copies the Agent Skills of this CLI version, named `duckless-<skill>`, see
+[Agent Skills](/duckless/guides/agent-skills/).
+
+| Option | Default | |
+| --- | --- | --- |
+| `--user` | off | install in your home directory instead of the current project |
+| `--target` | `all` | `claude` (`.claude/skills`), `agents` (`.agents/skills`) or `all` |

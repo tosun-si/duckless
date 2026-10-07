@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "duckless",
-      "source": "./plugin",
+      "source": "./duckless/plugin",
       "description": "Agent Skills for DuckLess: set it up, write jobs, size machines, debug runs, use DuckLake tables."
     }
   ]

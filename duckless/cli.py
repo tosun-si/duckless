@@ -15,6 +15,7 @@ from duckless.core.infra import InfraRequest, InfraStatus, default_runner_tag, e
 from duckless.core.job import JobReport, JobRequest, JobState, LogLine
 from duckless.core.preflight import PreflightReport
 from duckless.core.routing import ExecutorKind, Placement
+from duckless.core.skills import SkillTarget, install_plan, installed_name, skill_dirs, stale
 from duckless.settings import Settings, SettingsError
 from duckless.wiring import InfraServices, Services, cli_version, gcp_infra_services, gcp_services
 
@@ -194,6 +195,54 @@ def main_options(
     region: Region = None,
 ) -> None:
     ctx.obj = CliContext(project=project, region=region)
+    if ctx.invoked_subcommand != "skills":
+        _warn_stale_skills()
+
+
+def stale_skills_lines(stale_dirs: tuple[Path, ...], version: str) -> list[str]:
+    if not stale_dirs:
+        return []
+    homes = sorted({str(d.parent) for d in stale_dirs})
+    return [
+        f"note: DuckLess skills in {', '.join(homes)} are not from this CLI ({version}); "
+        "refresh them with `duckless skills install` (add --user for the home ones)"
+    ]
+
+
+def _warn_stale_skills() -> None:
+    from duckless.skills import installed_markers
+
+    version = cli_version()
+    markers = {**installed_markers(Path.cwd()), **installed_markers(Path.home())}
+    for line in stale_skills_lines(stale(markers, version), version):
+        typer.echo(line, err=True)
+
+
+skills_app = typer.Typer(help="Agent Skills for coding agents (Claude Code, and agents reading .agents/skills).")
+app.add_typer(skills_app, name="skills")
+
+
+@skills_app.command("install")
+def skills_install(
+    user: Annotated[
+        bool, typer.Option("--user", help="Install in your home directory instead of this project")
+    ] = False,
+    target: Annotated[
+        SkillTarget,
+        typer.Option(help="claude: .claude/skills; agents: .agents/skills (other agents); all: both"),
+    ] = SkillTarget.ALL,
+) -> None:
+    """Copy the skills of this CLI version into the project (default) or your home directory."""
+    from duckless.skills import bundled_skills, write
+
+    skills = bundled_skills()
+    base = Path.home() if user else Path.cwd()
+    dirs = skill_dirs(target, base)
+    write(install_plan(skills, dirs, cli_version()), tuple(skills))
+    for directory in dirs:
+        typer.echo(f"{directory}: {', '.join(installed_name(s) for s in sorted(skills))}")
+    if not user:
+        typer.echo("commit them so everyone working on this project gets the same skills")
 
 
 @app.command()
