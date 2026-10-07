@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from duckless import service
-from duckless.adapters.gcp_bootstrap import module_files
+from duckless.adapters.gcp_bootstrap import is_unknown_member, module_files
 from duckless.adapters.infra_manager import build_deployment, deployment_name
 from duckless.cli import infra_lines
 from duckless.core.infra import (
@@ -289,3 +289,17 @@ class TestInfraAdapters:
         # when / then
         assert envrc_lines(status) == ["export A=1", "export B=2"]
         assert infra_lines(status)[-2:] == ["export A=1", "export B=2"]
+
+
+class TestUnknownMember:
+    def test_given_fresh_service_account_error_when_checking_then_retryable(self) -> None:
+        # given
+        body = '{"error": {"message": "Service account x@p.iam.gserviceaccount.com does not exist."}}'
+
+        # when / then
+        assert is_unknown_member(400, body)
+
+    def test_given_other_errors_when_checking_then_not_retryable(self) -> None:
+        # when / then
+        assert not is_unknown_member(403, "does not exist")
+        assert not is_unknown_member(400, "etag mismatch")
