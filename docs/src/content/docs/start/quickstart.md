@@ -37,7 +37,7 @@ export DUCKLESS_PROJECT=my-project
 export DUCKLESS_REGION=europe-west1
 export DUCKLESS_BUCKET=my-project-duckless-work
 export DUCKLESS_SA=duckless-runner@my-project.iam.gserviceaccount.com
-export DUCKLESS_IMAGE=europe-west1-docker.pkg.dev/my-project/duckless-runner/tosun-si/duckless-runner:0.3.0
+export DUCKLESS_IMAGE=europe-west1-docker.pkg.dev/my-project/duckless-runner/tosun-si/duckless-runner:0.3.1
 ```
 
 Put them in your `.envrc` (or export them in your shell). Every other command reads them.
