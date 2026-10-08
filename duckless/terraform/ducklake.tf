@@ -88,6 +88,9 @@ resource "google_sql_user" "runner" {
   name           = local.catalog_user
   type           = "CLOUD_IAM_SERVICE_ACCOUNT"
   database_roles = ["cloudsqlsuperuser"]
+  # The user owns the lake's catalog tables: Postgres refuses to drop it while they exist, and
+  # Terraform deletes it alongside the database. It goes with the instance anyway.
+  deletion_policy = "ABANDON"
 }
 
 resource "google_project_iam_member" "runner_catalog" {

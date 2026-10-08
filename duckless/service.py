@@ -154,8 +154,11 @@ def destroy_infra(
         return status  # keep the infra SA: it is needed to retry the deletion
     if current and current.outputs.get("ducklake_instance"):
         network = current.outputs.get("network", "default")
-        on_step(f"kept: the private services access of network '{network}' (other Cloud SQL instances may use it)")
-        on_step(f"  to remove it once unused: {psa_cleanup_command(request.project, network)}")
+        on_step(f"kept: the private services access of network '{network}', shared by every Cloud SQL instance on it")
+        on_step(
+            "  only if nothing else on that network uses it (other Cloud SQL, Memorystore...), remove it with: "
+            + psa_cleanup_command(request.project, network)
+        )
 
     on_step("removing the Infra Manager service account and the staging bucket")
     infra_sa = f"{infra_service_account_id(request)}@{request.project}.iam.gserviceaccount.com"
