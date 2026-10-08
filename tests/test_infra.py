@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from duckless import service
-from duckless.adapters.gcp_bootstrap import is_unknown_member, module_files
+from duckless.adapters.gcp_bootstrap import GcpInfraBootstrap, is_unknown_member, module_files
 from duckless.adapters.infra_manager import build_deployment, deployment_name
 from duckless.cli import infra_lines
 from duckless.core.infra import (
@@ -325,3 +325,47 @@ class TestUnknownMember:
         # when / then
         assert not is_unknown_member(403, "does not exist")
         assert not is_unknown_member(400, "etag mismatch")
+
+
+class TestThrottling:
+    def test_given_quota_errors_when_calling_then_retries_until_success(self, monkeypatch) -> None:
+        # given: two 429s, then a success
+        monkeypatch.setattr("duckless.adapters.gcp_bootstrap.time.sleep", lambda s: None)
+        responses = iter([FakeResponse(429), FakeResponse(429), FakeResponse(200, {"ok": True})])
+        session = type("Session", (), {"request": lambda self, method, url, **kw: next(responses)})()
+        bootstrap = GcpInfraBootstrap(session, storage_client=None)
+
+        # when
+        body = bootstrap._call("GET", "https://example.test")
+
+        # then
+        assert body == {"ok": True}
+
+    def test_given_client_error_when_calling_then_no_retry(self, monkeypatch) -> None:
+        # given
+        calls: list[int] = []
+        monkeypatch.setattr("duckless.adapters.gcp_bootstrap.time.sleep", lambda s: None)
+        session = type(
+            "Session", (), {"request": lambda self, method, url, **kw: calls.append(1) or FakeResponse(403)}
+        )()
+
+        # when
+        response = GcpInfraBootstrap(session, storage_client=None)._request("GET", "https://example.test")
+
+        # then
+        assert (response.status_code, len(calls)) == (403, 1)
+
+
+class FakeResponse:
+    def __init__(self, status_code: int, body: dict | None = None) -> None:
+        self.status_code = status_code
+        self._body = body or {}
+        self.content = b"x" if body else b""
+        self.text = ""
+
+    def json(self) -> dict:
+        return self._body
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise RuntimeError(self.status_code)
