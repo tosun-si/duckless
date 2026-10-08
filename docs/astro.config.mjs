@@ -49,6 +49,7 @@ export default defineConfig({
 						{ label: 'Architecture', slug: 'reference/architecture' },
 					],
 				},
+				{ label: 'Examples', slug: 'examples' },
 				{ label: 'Benchmarks', slug: 'benchmarks' },
 			],
 		}),
