@@ -21,6 +21,9 @@ SKIPPED_PARTS = frozenset({".terraform", ".terraform.lock.hcl", "__pycache__"})
 OPERATION_POLL_SECONDS = 3
 # A service account created a moment ago can be unknown to setIamPolicy for up to a minute.
 NEW_MEMBER_DELAYS = (2, 4, 8, 15, 30)
+# Per-minute API quotas (429) and transient errors: retry for a bit over a minute, then give up.
+THROTTLE_DELAYS = (2, 5, 10, 20, 30)
+RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 
 
 def is_unknown_member(status_code: int, body: str) -> bool:
@@ -54,8 +57,16 @@ class GcpInfraBootstrap:
         self._session = session
         self._storage = storage_client
 
+    def _request(self, method: str, url: str, **kwargs):
+        for delay in (*THROTTLE_DELAYS, None):
+            response = self._session.request(method, url, **kwargs)
+            if delay is None or response.status_code not in RETRYABLE_STATUS:
+                return response
+            time.sleep(delay)
+        return response
+
     def _call(self, method: str, url: str, **kwargs) -> dict:
-        response = self._session.request(method, url, **kwargs)
+        response = self._request(method, url, **kwargs)
         response.raise_for_status()
         return response.json() if response.content else {}
 
@@ -82,7 +93,7 @@ class GcpInfraBootstrap:
 
     def ensure_service_account(self, project: str, account_id: str, display_name: str) -> str:
         email = f"{account_id}@{project}.iam.gserviceaccount.com"
-        existing = self._session.get(f"{IAM}/projects/{project}/serviceAccounts/{email}")
+        existing = self._request("GET", f"{IAM}/projects/{project}/serviceAccounts/{email}")
         if existing.status_code == 404:
             self._call(
                 "POST",
@@ -101,7 +112,7 @@ class GcpInfraBootstrap:
             return False
         for delay in (*NEW_MEMBER_DELAYS, None):
             # The etag in `updated` makes a concurrent change fail instead of being overwritten.
-            response = self._session.post(f"{resource}:setIamPolicy", json={"policy": updated})
+            response = self._request("POST", f"{resource}:setIamPolicy", json={"policy": updated})
             if delay is None or not is_unknown_member(response.status_code, response.text):
                 break
             time.sleep(delay)
@@ -115,12 +126,12 @@ class GcpInfraBootstrap:
         self._update_policy(project, lambda policy: without_bindings(policy, member, roles))
 
     def delete_service_account(self, project: str, email: str) -> None:
-        response = self._session.delete(f"{IAM}/projects/{project}/serviceAccounts/{email}")
+        response = self._request("DELETE", f"{IAM}/projects/{project}/serviceAccounts/{email}")
         if response.status_code != 404:
             response.raise_for_status()
 
     def has_private_service_access(self, project: str, network: str) -> bool:
-        response = self._session.get(f"{COMPUTE}/projects/{project}/global/networks/{network}")
+        response = self._request("GET", f"{COMPUTE}/projects/{project}/global/networks/{network}")
         if response.status_code in (403, 404):  # Compute not enabled yet, or no such network
             return False
         response.raise_for_status()
@@ -128,7 +139,8 @@ class GcpInfraBootstrap:
 
     def create_private_service_access(self, project: str, network: str, range_name: str) -> None:
         network_path = f"projects/{project}/global/networks/{network}"
-        address = self._session.post(
+        address = self._request(
+            "POST",
             f"{COMPUTE}/projects/{project}/global/addresses",
             json={
                 "name": range_name,
