@@ -8,6 +8,18 @@ description: Tables with snapshots, time travel and concurrent writers, stored a
 stays Parquet in your bucket; a Postgres database keeps the catalog (which files make which
 table version).
 
+## Why a database
+
+DuckDB alone, like Dataflow or Spark, is a compute engine: it reads and writes files and needs
+nothing else. That is how DuckLess runs by default, with nothing left running between jobs.
+
+DuckLake is a table format: it has to remember which files make which version of which table,
+and that memory is the catalog. Every table format has one (Iceberg uses BigLake Metastore or a
+REST catalog, Delta a Unity or Hive metastore). DuckLake keeps it in a plain SQL database, here
+Cloud SQL for PostgreSQL. Turn DuckLake on when you need tables that change (updates, deletes,
+corrections, several writers); for data that is only appended or fully recomputed, plain Parquet
+is simpler and costs nothing between jobs.
+
 ## Turn it on
 
 ```bash
@@ -82,3 +94,37 @@ ADC credentials.
 - **Upgrades keep the catalog.** `duckless init` without `--ducklake` keeps what the
   deployment has. Removing it takes `--no-ducklake` and fails while deletion protection is on:
   only `destroy --force` turns that off.
+
+## Several projects, one catalog
+
+Data platforms often spread pipelines over several projects (one per domain or team). One
+DuckLake catalog per project means one Cloud SQL instance per project; a single instance in a
+shared project, with one database per lake, costs less and leaves one instance to back up,
+monitor and upgrade.
+
+:::caution[Not automated yet]
+`duckless init --ducklake` creates a catalog in the installation's own project. Pointing an
+installation at a catalog in another project is planned, not available yet. The constraints
+below hold whatever the tooling.
+:::
+
+**Network.** The catalog has a private IP only, so jobs in the other projects must reach it:
+
+| Option | Works | |
+| --- | --- | --- |
+| Shared VPC: the instance and the jobs on the host project's network | yes | the usual setup in large organizations; nothing more to configure |
+| Private Service Connect: the instance allows a list of consumer projects | yes | when there is no Shared VPC; the Cloud SQL Auth Proxy supports it |
+| VPC peering between the projects' networks | no | private services access is itself a peering, and peerings are not transitive |
+
+**Isolation.** On an instance of its own, the runner being `cloudsqlsuperuser` gives it nothing
+it does not already have. On a shared instance it would let one team read or break another
+team's catalog: each lake needs its own database, and each runner account grants on its database
+only.
+
+**Data.** The catalog is central; the Parquet files stay in each project's own bucket, owned by
+the team that writes them.
+
+**Availability.** Every lake depends on the shared instance: give it high availability
+(`REGIONAL`) and more than a `db-g1-small`. It still costs less than an instance per project
+from four or five projects on.
+
