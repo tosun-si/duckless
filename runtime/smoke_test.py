@@ -28,6 +28,8 @@ for statement in session_sql(runtime_settings()):
     if "SECRET" not in statement:  # needs GCP credentials
         con.sql(statement)
 
+# A job's last SELECT is fetched in Python: TIMESTAMPTZ values need pytz.
+assert con.sql("SELECT TIMESTAMPTZ '2026-10-08 10:00:00+00' AS t").fetchone()[0].year == 2026
 assert cpus_from_quota("800000 100000") == 8
 assert open_files_target(1024, 524288) == 65536 and open_files_target(1024, 4096) == 4096
 assert raise_open_files_limit() >= 1024
