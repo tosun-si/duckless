@@ -1,0 +1,40 @@
+# Rules for the raw customers file. Checked by Pydantic before any data is read; each rule
+# becomes one SQL predicate that DuckDB runs over the whole file.
+
+source:
+  path: gs://${DUCKLESS_BUCKET}/examples/raw/validation/customers.csv
+  # The expected schema: a line whose values do not fit it is a parse error, not a crash.
+  columns:
+    customer_id: BIGINT
+    name: VARCHAR
+    email: VARCHAR
+    country: VARCHAR
+    signup_date: DATE
+    lifetime_value: DECIMAL(12,2)
+  key: customer_id
+
+report: gs://${DUCKLESS_BUCKET}/examples/validation/customers
+
+# Fail the job when more than this share of the lines has at least one error.
+max_error_rate: 0.01
+
+rules:
+  - name: customer_id_unique
+    unique: customer_id
+
+  - name: name_required
+    not_null: name
+
+  - name: email_format
+    column: email
+    matches: '^[^@\s]+@[^@\s]+\.[a-z]{2,}$'
+
+  - name: country_known
+    column: country
+    one_of: [FR, DE, ES, IT, GB, US, BE, NL, PT, CH]
+
+  - name: signup_not_in_future
+    check: signup_date <= current_date
+
+  - name: lifetime_value_positive
+    check: lifetime_value >= 0

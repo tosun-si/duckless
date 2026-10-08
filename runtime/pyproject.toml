@@ -7,7 +7,9 @@ dependencies = [
     "duckdb==1.5.6",
     "numpy>=2.3",  # DuckDB Python UDFs need it
     "pyarrow>=21",  # vectorized (arrow) UDFs
+    "pydantic>=2.11",  # validating job configuration (examples/03-raw-validation)
     "pytz>=2025.2",  # DuckDB needs it to return TIMESTAMPTZ values to Python (now(), ducklake_snapshots)
+    "pyyaml>=6.0",  # job configuration files
 ]
 
 [build-system]

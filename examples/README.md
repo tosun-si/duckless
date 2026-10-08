@@ -8,6 +8,7 @@ the job files and a README with the commands.
 | [`00-seed`](00-seed/) | Generate TPC-H data on the runner and write it to your work bucket as Parquet |
 | [`01-daily-marts`](01-daily-marts/) | Raw Parquet to two marts in plain SQL: joins, a partitioned write, a parallel write |
 | [`02-ducklake-incremental`](02-ducklake-incremental/) | CSV drops loaded into a DuckLake table, late corrections from JSON (`UPDATE`, `DELETE`), snapshots and time travel |
+| [`03-raw-validation`](03-raw-validation/) | Validate a raw CSV against YAML rules: Pydantic checks the rules, DuckDB checks 100 million lines in about a minute, errors reported to GCS |
 
 They need an installation (`duckless init`, see the
 [quickstart](https://tosun-si.github.io/duckless/start/quickstart/)); example 02 needs one with
