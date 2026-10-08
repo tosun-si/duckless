@@ -42,6 +42,11 @@ log("done", rows=123)  # structured log line, visible in `duckless logs`
 - **No secrets in code or in DSNs.** Credentials come from the service account (ADC). DuckDB
   prints full connection strings in its errors, so a password in a DSN ends up in the logs.
 - **Paths:** `gs://` for files; `gcss://` only for a DuckLake `DATA_PATH`.
+- **Formats:** Parquet, CSV (`read_csv`) and JSON (`read_json`) are built in; Excel
+  (`LOAD excel`, `read_xlsx`), Avro and Iceberg are in the runner image. Text formats are parsed
+  in full on every read: convert CSV/JSON to Parquet or a DuckLake table once, then query that.
+  Prefer newline-delimited JSON and many medium files over one big `.gz` (not split across threads).
+  Other extensions (`delta`, `spatial`) need an image built `FROM` the runner.
 - **Custom images** start `FROM ghcr.io/tosun-si/duckless-runner:<version>` to keep
   `duckless_runtime` and the extensions; the runner service account needs
   `roles/artifactregistry.reader` on the image's repository.

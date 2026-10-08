@@ -123,6 +123,28 @@ gcloud artifacts repositories add-iam-policy-binding jobs --location europe \
   --member serviceAccount:$DUCKLESS_SA --role roles/artifactregistry.reader
 ```
 
+## File formats
+
+Every format below reads and writes on `gs://` like local files, with the job's credentials.
+
+| Format | Read | Write | Notes |
+| --- | --- | --- | --- |
+| Parquet | `read_parquet` | `COPY … (FORMAT parquet)` | the fastest by far: columnar, compressed, DuckDB skips the columns and row groups a query does not need |
+| CSV | `read_csv` | `COPY … (FORMAT csv)` | delimiter, header and types detected; read in parallel, but every byte is parsed. A `.csv.gz` is read by one thread: many medium files beat one big one |
+| JSON | `read_json` | `COPY … (FORMAT json)` | newline-delimited JSON (one object per line) is read in parallel; a single JSON array is not |
+| Excel | `read_xlsx` (`LOAD excel` first) | `COPY … (FORMAT xlsx, HEADER true)` | read whole, single-threaded: reference data, not volume |
+| Avro | `read_avro` (`LOAD avro`) | | |
+| Iceberg | `iceberg_scan` (`LOAD iceberg`) | | |
+
+Text formats cost a full parse on every read. When a job reads the same CSV or JSON more than
+once, convert it once to Parquet (or a [DuckLake](/duckless/guides/ducklake/) table) and query
+that: [example 02](https://github.com/tosun-si/duckless/tree/main/examples/02-ducklake-incremental)
+does exactly this.
+
+Other DuckDB extensions (`delta`, `spatial`…) are not in the runner image: the job VMs have no
+internet access to install them. Build an image `FROM` the runner with `INSTALL <extension>` and
+run it with `duckless exec`.
+
 ## Writing to GCS fast
 
 DuckDB writes a single file sequentially by default. To GCS that caps around 110 MB/s,
