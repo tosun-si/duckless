@@ -11,12 +11,24 @@
   <a href="https://github.com/tosun-si/duckless/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-F7B32B?labelColor=13233A"></a>
 </p>
 
-Serverless DuckDB on GCP. Submit SQL or your own code; DuckLess runs it on a right-sized
-Compute Engine VM (Cloud Batch) **in your project**, reads and writes GCS through ADC
-(no HMAC keys), spills on local SSD, then tears the VM down. Nothing runs between jobs.
+<p align="center">
+  <b><a href="https://tosun-si.github.io/duckless/">Documentation</a></b> ·
+  <a href="https://tosun-si.github.io/duckless/start/quickstart/">Quickstart</a> ·
+  <a href="https://tosun-si.github.io/duckless/benchmarks/">Benchmarks</a> ·
+  <a href="https://github.com/tosun-si/duckless/releases">Releases</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
-> Status: early releases (v0.1.x). Changes are listed in the [GitHub Releases](https://github.com/tosun-si/duckless/releases);
-> `spike/README.md` has the measurements behind the design.
+Serverless DuckDB on GCP. Submit SQL or your own code; DuckLess runs it **in your project**
+on a right-sized machine (Cloud Batch VM with local SSD for spill, or Cloud Run Jobs for small
+jobs), reads and writes GCS with the job's own credentials (no HMAC keys), then tears it down.
+Nothing runs between jobs. Optional [DuckLake](https://tosun-si.github.io/duckless/guides/ducklake/)
+tables on a Cloud SQL catalog, and [Agent Skills](https://tosun-si.github.io/duckless/guides/agent-skills/)
+for coding agents.
+
+> Status: v0.3, young and tested on real projects. Changes are listed in the
+> [GitHub Releases](https://github.com/tosun-si/duckless/releases); the
+> [benchmarks](https://tosun-si.github.io/duckless/benchmarks/) have the measurements behind the design.
 
 ## Quick start
 
@@ -39,6 +51,10 @@ duckless destroy --project my-project       # removes what init created
 Infrastructure Manager: no local Terraform, state kept in your project, re-run it to upgrade.
 Teams managing infra as code can use the same module directly instead.
 
+Full guide: [tosun-si.github.io/duckless](https://tosun-si.github.io/duckless/), from the
+[quickstart](https://tosun-si.github.io/duckless/start/quickstart/) to the
+[CLI reference](https://tosun-si.github.io/duckless/reference/cli/).
+
 ## Writing jobs
 
 - **SQL** (`.sql`): `${VAR}` placeholders come from the job env (`DUCKLESS_BUCKET`, `--env K=V`).
@@ -48,6 +64,9 @@ Teams managing infra as code can use the same module directly instead.
   is 7-8x faster than the single-writer default (~900 MB/s vs ~110 MB/s on 32 vCPU).
 - **Vectorize Python logic**: a row-wise Python UDF runs at ~8k rows/s on one thread; use an
   Arrow UDF over numpy (`type="arrow"`) or SQL.
+
+More in [Writing jobs](https://tosun-si.github.io/duckless/guides/writing-jobs/) and
+[Machines, Spot and spill](https://tosun-si.github.io/duckless/guides/machines/).
 
 ## Agent Skills
 
@@ -73,20 +92,23 @@ Hexagonal, kept light: a pure core, ports, adapters, and one wiring point.
 | Path | What |
 | --- | --- |
 | `duckless/core/` | Pure rules, no I/O: machine types and local SSD counts, job spec and planning, quotas, preflight |
-| `duckless/ports.py` | What the service needs from outside: `Executor`, `ArtifactStore`, `LogReader`, `QuotaReader` (Protocols) |
+| `duckless/ports.py` | What the service needs from outside: `Executor`, `ArtifactStore`, `LogReader`, `QuotaReader`, `InfraBootstrap`, `InfraDeployer` (Protocols) |
 | `duckless/service.py` | Operations shared by the CLI, the SDK and later the SaaS control plane: functions taking ports as arguments |
-| `duckless/adapters/` | GCP implementations: Cloud Batch, GCS, Cloud Logging, Compute quotas |
+| `duckless/adapters/` | GCP implementations: Cloud Batch, Cloud Run Jobs, GCS, Cloud Logging, Compute quotas, Infrastructure Manager |
 | `duckless/wiring.py` | Binds the service functions to the adapters (lazily) |
 | `duckless/cli.py` | `duckless` command, a driving adapter |
-| `runtime/` | Runner image (`duckless_runtime`), published as `ghcr.io/tosun-si/duckless-runner`: DuckDB + `gcs` community extension, tuned for the VM |
-| `duckless/terraform/` | APIs, work bucket, least-privilege runner service account, Artifact Registry remote repository proxying the runner image |
+| `runtime/` | Runner image (`duckless_runtime`), published as `ghcr.io/tosun-si/duckless-runner`: DuckDB + `gcs` community extension, DuckLake + Cloud SQL Auth Proxy, tuned for the machine |
+| `duckless/terraform/` | APIs, work bucket, least-privilege runner service account, Artifact Registry remote repository proxying the runner image, optional DuckLake catalog |
 | `duckless/plugin/` | Claude Code plugin: the Agent Skills (`duckless/plugin/skills/`), listed by `.claude-plugin/marketplace.json` |
 | `spike/` | The spike that validated the approach, kept as a record |
 
 Dependency rule: `core` imports nothing else from DuckLess, `service` only `core` and `ports`,
 and only `wiring` imports `adapters`.
 
-## Development
+## Contributing
+
+Issues and pull requests are welcome: bug reports, real use cases, docs, code. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the setup, the conventions and how changes are tested.
 
 ```bash
 uv sync
@@ -94,4 +116,7 @@ uv run pytest
 uv run ruff check . && uv run ruff format --check .
 ```
 
-License: Apache-2.0
+## License
+
+DuckLess is open source under the [Apache License 2.0](LICENSE). You can use it, modify it and
+ship it, commercially or not; keep the license and the notices.
