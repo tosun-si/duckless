@@ -12,6 +12,9 @@ hero:
     - text: Quick start
       link: /duckless/start/quickstart/
       icon: right-arrow
+    - text: Examples
+      link: /duckless/examples/
+      variant: minimal
     - text: Why DuckLess
       link: /duckless/start/why/
       variant: minimal
@@ -37,5 +40,11 @@ duckless run daily_revenue.sql --machine n2-highmem-32 --spot
 	</Card>
 	<Card title="SQL or your own code" icon="seti:python">
 		Run a `.sql` file, a Python script with a ready-to-use DuckDB connection, or your own image and command (dbt, …).
+	</Card>
+	<Card title="Files, BigQuery, tables" icon="document">
+		Read Parquet, CSV, JSON and Excel on GCS, and BigQuery tables. Keep tables that change in DuckLake, with snapshots and time travel.
+	</Card>
+	<Card title="Runnable examples" icon="open-book">
+		[Daily marts, late corrections with DuckLake, raw data validation, BigQuery to Python](/duckless/examples/): run them as they are, then adapt them.
 	</Card>
 </CardGrid>

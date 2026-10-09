@@ -146,6 +146,14 @@ Other DuckDB extensions (`delta`, `spatial`…) are not in the runner image: the
 internet access to install them. Build an image `FROM` the runner with `INSTALL <extension>` and
 run it with `duckless exec`.
 
+## Validating raw data
+
+Checking a raw file before using it is SQL too: each rule is one predicate DuckDB runs over the
+whole file, and lines that do not fit the expected schema are caught by the CSV reader
+(`store_rejects`). Keep Python for the configuration, never for each row.
+[Example 03](https://github.com/tosun-si/duckless/tree/main/examples/03-raw-validation) checks
+100 million lines against YAML rules in about a minute and writes every error to GCS.
+
 ## Writing to GCS fast
 
 DuckDB writes a single file sequentially by default. To GCS that caps around 110 MB/s,

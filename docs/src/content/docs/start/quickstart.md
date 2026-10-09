@@ -84,3 +84,10 @@ duckless destroy --project my-project --force
 ```
 
 `--force` also deletes the work bucket if it still holds files.
+
+## Next
+
+- Run the [examples](/duckless/examples/): daily marts, late corrections with DuckLake, raw data
+  validation, BigQuery to Python. The first one generates the data the others use.
+- Read [Writing jobs](/duckless/guides/writing-jobs/) for the habits that keep jobs fast, and
+  [Machines, Spot and spill](/duckless/guides/machines/) to size them.
