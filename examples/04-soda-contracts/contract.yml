@@ -1,0 +1,56 @@
+# A Soda v4 data contract for the raw customers file of example 03.
+# `columns` is also the schema the CSV is read with: a line that does not fit it is reported as
+# unparsable by DuckDB's reader, before Soda sees the data.
+dataset: duckless/main/customers
+
+columns:
+  - name: customer_id
+    data_type: bigint
+    checks:
+      - missing:
+      - duplicate:            # no tolerance: a duplicate key fails the contract
+  - name: name
+    data_type: varchar
+    checks:
+      - missing:
+          missing_values: [""]
+          threshold:
+            metric: percent
+            must_be_less_than: 1
+  - name: email
+    data_type: varchar
+    checks:
+      - invalid:
+          valid_format:
+            name: email
+            regex: '^[^@\s]+@[^@\s]+\.[a-z]{2,}$'
+          threshold:
+            metric: percent
+            must_be_less_than: 1
+  - name: country
+    data_type: varchar
+    checks:
+      - invalid:
+          valid_values: [FR, DE, ES, IT, GB, US, BE, NL, PT, CH]
+          threshold:
+            metric: percent
+            must_be_less_than: 1
+  - name: signup_date
+    data_type: date
+  - name: lifetime_value
+    data_type: decimal       # read as DECIMAL(18,3); Soda v4 contracts compare the type, not the precision
+    checks:
+      - invalid:
+          valid_min: 0
+          threshold:
+            metric: percent
+            must_be_less_than: 1
+
+checks:
+  - schema:
+  - row_count:
+  - failed_rows:
+      name: signup_not_in_future
+      expression: signup_date > current_date
+      threshold:
+        level: warn            # reported, does not fail the contract
