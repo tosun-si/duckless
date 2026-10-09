@@ -14,6 +14,7 @@ from duckless_runtime import (
     runtime_settings,
     session_sql,
 )
+from duckless_runtime.bigquery import scan_sql
 from duckless_runtime.lake import PROXY, attach_sql, lake_settings
 
 con = duckdb.connect(config={"autoinstall_known_extensions": False})
@@ -23,6 +24,7 @@ assert installed.get("gcs"), "gcs community extension must be baked in"
 assert installed.get("tpch"), "tpch extension must be baked in"
 assert installed.get("ducklake") and installed.get("postgres_scanner"), "DuckLake catalog extensions must be baked in"
 assert all(installed.get(e) for e in ("excel", "avro", "iceberg")), "file format extensions must be baked in"
+assert installed.get("bigquery"), "bigquery extension must be baked in"
 assert not installed.get("httpfs"), "httpfs must not be installed: it would take over gs://"
 
 for statement in session_sql(runtime_settings()):
@@ -48,8 +50,12 @@ lake = lake_settings(
 )
 assert lake is not None and lake.user == "runner@p.iam" and "password" not in attach_sql(lake)
 assert lake_settings({}) is None
-for extension in ("excel", "avro", "iceberg"):
+expected = "SELECT \"a\" FROM bigquery_scan('p.d.t', filter = 'x = ''y''')"
+assert scan_sql("p:d.t", ["a"], "x = 'y'") == expected
+for extension in ("excel", "avro", "iceberg", "bigquery"):
     con.sql(f"LOAD {extension}")
 con.sql("COPY (SELECT 1 AS a) TO '/tmp/smoke.xlsx' (FORMAT xlsx, HEADER true)")
 assert con.sql("SELECT a FROM read_xlsx('/tmp/smoke.xlsx')").fetchone()[0] == 1
-print(f"smoke ok: duckdb {duckdb.__version__}, gcs, tpch, ducklake, postgres, excel, avro, iceberg, proxy, no httpfs")
+print(
+    f"smoke ok: duckdb {duckdb.__version__}, gcs, tpch, ducklake, postgres, excel, avro, iceberg, bigquery, proxy, no httpfs"
+)

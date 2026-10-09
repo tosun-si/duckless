@@ -13,6 +13,7 @@ runner, so nothing needs downloading.
 | [Daily marts](https://github.com/tosun-si/duckless/tree/main/examples/01-daily-marts) | joins, a partitioned write and a parallel write, in plain SQL | `duckless run examples/01-daily-marts/marts.sql -m n2-standard-8` |
 | [Late corrections with DuckLake](https://github.com/tosun-si/duckless/tree/main/examples/02-ducklake-incremental) | CSV drops into a table, JSON corrections applied with `UPDATE` and `DELETE`, snapshots, time travel | `duckless run examples/02-ducklake-incremental/load_day.sql -m n2-standard-4 -e LOAD_DATE=1998-07-01` |
 | [Raw data validation](https://github.com/tosun-si/duckless/tree/main/examples/03-raw-validation) | YAML rules checked by Pydantic, data checked by DuckDB (100 million lines in about a minute), errors reported to GCS, job failing above a threshold | `duckless run examples/03-raw-validation/validate.py -m n2-standard-8 -e RULES=gs://…/rules.yaml` |
+| [BigQuery to Python](https://github.com/tosun-si/duckless/tree/main/examples/05-bigquery-to-python) | read a BigQuery table in SQL and Python, vectorized NumPy logic, result to GCS | `duckless run examples/05-bigquery-to-python/score_orders.py -m n2-highmem-16 --on batch -e BQ_DATASET=…` |
 
 Run them from the repository root, in an installation made with `duckless init` (`--ducklake`
 for the third). Everything they write goes under `gs://$DUCKLESS_BUCKET/examples/`.

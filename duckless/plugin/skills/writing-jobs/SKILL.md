@@ -47,6 +47,10 @@ log("done", rows=123)  # structured log line, visible in `duckless logs`
   in full on every read: convert CSV/JSON to Parquet or a DuckLake table once, then query that.
   Prefer newline-delimited JSON and many medium files over one big `.gz` (not split across threads).
   Other extensions (`delta`, `spatial`) need an image built `FROM` the runner.
+- **BigQuery:** `bigquery_scan('project.dataset.table', filter = '…')` in SQL, `read_bigquery(con, table,
+  columns, where)` in Python (a DuckDB relation: SQL, Arrow batches, pandas, Polars). Select the columns
+  and filter: only those leave BigQuery. Needs `init --bigquery-dataset <dataset>`; large tables
+  read much faster on Cloud Batch (`--on batch`) than on Cloud Run.
 - **Custom images** start `FROM ghcr.io/tosun-si/duckless-runner:<version>` to keep
   `duckless_runtime` and the extensions; the runner service account needs
   `roles/artifactregistry.reader` on the image's repository.

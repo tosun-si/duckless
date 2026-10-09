@@ -135,6 +135,7 @@ Every format below reads and writes on `gs://` like local files, with the job's 
 | Excel | `read_xlsx` (`LOAD excel` first) | `COPY … (FORMAT xlsx, HEADER true)` | read whole, single-threaded: reference data, not volume |
 | Avro | `read_avro` (`LOAD avro`) | | |
 | Iceberg | `iceberg_scan` (`LOAD iceberg`) | | |
+| BigQuery tables | `bigquery_scan`, `read_bigquery()` | | see [Reading BigQuery](/duckless/guides/bigquery/) |
 
 Text formats cost a full parse on every read. When a job reads the same CSV or JSON more than
 once, convert it once to Parquet (or a [DuckLake](/duckless/guides/ducklake/) table) and query

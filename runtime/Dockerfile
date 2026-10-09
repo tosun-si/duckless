@@ -44,9 +44,10 @@ USER app
 
 # Extensions baked in (~/.duckdb/extensions): VMs have no external IP, and
 # httpfs is deliberately absent so gs:// is always served by the gcs extension.
-# File formats beyond the built-in Parquet, CSV and JSON: Excel, Avro, Iceberg tables. delta and
-# spatial (80 MB each) are left to images built FROM this one.
-RUN python -c "import duckdb; c = duckdb.connect(); [c.sql(f'INSTALL {e}') for e in ('gcs FROM community', 'tpch', 'ducklake', 'postgres', 'excel', 'avro', 'iceberg')]"
+# File formats beyond the built-in Parquet, CSV and JSON: Excel, Avro, Iceberg tables; BigQuery
+# tables through the Storage Read API. delta and spatial (80 MB each) are left to images built
+# FROM this one.
+RUN python -c "import duckdb; c = duckdb.connect(); [c.sql(f'INSTALL {e}') for e in ('gcs FROM community', 'tpch', 'ducklake', 'postgres', 'excel', 'avro', 'iceberg', 'bigquery FROM community')]"
 
 ENTRYPOINT ["python", "-m", "duckless_runtime"]
 CMD ["--help"]

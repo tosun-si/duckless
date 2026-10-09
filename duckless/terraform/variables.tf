@@ -80,3 +80,15 @@ variable "catalog_tier" {
   type        = string
   default     = "db-g1-small"
 }
+
+variable "bigquery_datasets" {
+  description = "BigQuery datasets of this project the jobs may read (dataset ids): the runner gets roles/bigquery.dataViewer on each, and the Storage Read API on the project."
+  type        = list(string)
+  default     = []
+}
+
+variable "bigquery_jobs" {
+  description = "Let jobs run BigQuery queries (the extension's ATTACH, bigquery_query): roles/bigquery.jobUser on the project."
+  type        = bool
+  default     = false
+}

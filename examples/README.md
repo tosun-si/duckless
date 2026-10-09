@@ -9,6 +9,7 @@ the job files and a README with the commands.
 | [`01-daily-marts`](01-daily-marts/) | Raw Parquet to two marts in plain SQL: joins, a partitioned write, a parallel write |
 | [`02-ducklake-incremental`](02-ducklake-incremental/) | CSV drops loaded into a DuckLake table, late corrections from JSON (`UPDATE`, `DELETE`), snapshots and time travel |
 | [`03-raw-validation`](03-raw-validation/) | Validate a raw CSV against YAML rules: Pydantic checks the rules, DuckDB checks 100 million lines in about a minute, errors reported to GCS |
+| [`05-bigquery-to-python`](05-bigquery-to-python/) | Read a BigQuery table (SQL and Python), score it with a vectorized NumPy function, write it to GCS |
 
 They need an installation (`duckless init`, see the
 [quickstart](https://tosun-si.github.io/duckless/start/quickstart/)); example 02 needs one with
