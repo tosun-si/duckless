@@ -59,6 +59,10 @@ SELECT * FROM ducklake_snapshots('lake');              -- history
 
 In Python, `duckless_runtime.connect()` returns a connection with `lake` attached.
 
+[Example 02](https://github.com/tosun-si/duckless/tree/main/examples/02-ducklake-incremental) goes
+through it end to end: daily CSV loads, late corrections from JSON applied with `UPDATE` and
+`DELETE`, snapshots and time travel.
+
 Jobs run on Cloud Batch or Cloud Run Jobs alike: Cloud Run jobs get Direct VPC egress to the
 catalog's private IP (private ranges only; Google APIs keep their usual path).
 
