@@ -32,6 +32,8 @@ one `statement_done` per statement, then `job_done` or `job_failed` with the err
 | `Too many open files` | old runner image | runner ≥ 0.2.0 raises the limit |
 | DuckLake `ATTACH` fails | catalog unreachable | see the `ducklake` skill: network, `.envrc` lines, Cloud Run VPC egress |
 | Slow writes to GCS | single Parquet writer | `PER_THREAD_OUTPUT, FILE_SIZE_BYTES '256MB'` |
+| BigQuery `Permission Denied` | dataset not granted, or a query (`ATTACH`, `bigquery_query`) without `--bigquery-jobs` | `duckless init --bigquery-dataset <dataset>` (`--bigquery-jobs` for queries); datasets of other projects: their owners grant `roles/bigquery.dataViewer` |
+| Slow BigQuery read | large table on Cloud Run | `--on batch`, select fewer columns, add a `filter` |
 | Slow Python | row-by-row UDF | vectorized (Arrow) UDF or SQL |
 
 ## When it is none of these

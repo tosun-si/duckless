@@ -32,6 +32,8 @@ INFRA_SA_ROLES = (
 
 # Only with DuckLake: the catalog instance (the network peering is set up by `init` itself).
 CATALOG_INFRA_SA_ROLES = ("roles/cloudsql.admin",)
+# Only with BigQuery datasets: the module grants the runner read access on each of them.
+BIGQUERY_INFRA_SA_ROLES = ("roles/bigquery.dataOwner",)
 # APIs `init` needs to set up the network's private services access before applying.
 CATALOG_BOOTSTRAP_APIS = ("compute.googleapis.com", "servicenetworking.googleapis.com")
 
@@ -52,6 +54,8 @@ class InfraRequest:
     force_destroy: bool = False
     ducklake: bool | None = None  # None: keep what the deployment has (off for a new one)
     network: str | None = None  # None: keep what the deployment has ("default" for a new one)
+    bigquery_datasets: tuple[str, ...] | None = None  # None: keep the deployment's
+    bigquery_jobs: bool | None = None  # None: keep the deployment's (off for a new one)
 
     def __post_init__(self) -> None:
         if not self.project or not self.region:
@@ -59,6 +63,8 @@ class InfraRequest:
         if not _NAME_RE.match(self.name):
             # Prefixes a service account id (6-30 chars) and bucket names.
             raise InvalidInfraRequestError(f"name '{self.name}' must match {_NAME_RE.pattern}")
+        for dataset in self.bigquery_datasets or ():
+            bigquery_dataset_id(self.project, dataset)
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,8 +105,25 @@ def module_prefix(version: str) -> str:
     return f"module/{version}"
 
 
-def infra_sa_roles(ducklake: bool) -> tuple[str, ...]:
-    return INFRA_SA_ROLES + (CATALOG_INFRA_SA_ROLES if ducklake else ())
+def infra_sa_roles(ducklake: bool, bigquery: bool = False) -> tuple[str, ...]:
+    return INFRA_SA_ROLES + (CATALOG_INFRA_SA_ROLES if ducklake else ()) + (BIGQUERY_INFRA_SA_ROLES if bigquery else ())
+
+
+def bigquery_dataset_id(project: str, dataset: str) -> str:
+    """`dataset`, `project:dataset` or `project.dataset` -> the dataset id, in the installation's project.
+
+    Datasets of other projects are granted by their owners: Infrastructure Manager only acts in
+    the installation's project.
+    """
+    owner, _, name = dataset.replace(":", ".", 1).rpartition(".")
+    if not re.fullmatch(r"[A-Za-z0-9_]{1,1024}", name):
+        raise InvalidInfraRequestError(f"'{dataset}' is not a BigQuery dataset name")
+    if owner and owner != project:
+        raise InvalidInfraRequestError(
+            f"dataset '{dataset}' is in another project: ask its owners to grant the runner "
+            "roles/bigquery.dataViewer on it (init grants datasets of its own project only)"
+        )
+    return name
 
 
 def resolved_request(request: InfraRequest, current: InfraStatus | None) -> InfraRequest:
@@ -111,6 +134,14 @@ def resolved_request(request: InfraRequest, current: InfraStatus | None) -> Infr
         request,
         ducklake=request.ducklake if request.ducklake is not None else bool(outputs.get("ducklake_instance")),
         network=request.network or outputs.get("network") or "default",
+        bigquery_datasets=(
+            request.bigquery_datasets
+            if request.bigquery_datasets is not None
+            else tuple(outputs.get("bigquery_datasets") or ())
+        ),
+        bigquery_jobs=(
+            request.bigquery_jobs if request.bigquery_jobs is not None else bool(outputs.get("bigquery_jobs"))
+        ),
     )
 
 
@@ -136,6 +167,8 @@ def deployment_inputs(request: InfraRequest) -> dict[str, Any]:
         "force_destroy": request.force_destroy,
         "ducklake": bool(request.ducklake),
         "network": request.network or "default",
+        "bigquery_datasets": [bigquery_dataset_id(request.project, d) for d in request.bigquery_datasets or ()],
+        "bigquery_jobs": bool(request.bigquery_jobs),
     }
 
 

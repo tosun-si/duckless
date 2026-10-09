@@ -43,3 +43,13 @@ output "envrc" {
   %{~endif}
   EOT
 }
+
+output "bigquery_datasets" {
+  description = "BigQuery datasets the jobs may read (kept by the next `duckless init`)."
+  value       = var.bigquery_datasets
+}
+
+output "bigquery_jobs" {
+  description = "Whether jobs may run BigQuery queries (kept by the next `duckless init`)."
+  value       = var.bigquery_jobs
+}

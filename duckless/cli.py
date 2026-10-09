@@ -265,6 +265,20 @@ def init(
     network: Annotated[
         str | None, typer.Option(help="VPC network of the jobs and the catalog (default: the deployment's, or default)")
     ] = None,
+    bigquery_dataset: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--bigquery-dataset",
+            help="BigQuery dataset of this project jobs may read, repeatable; default: the deployment's",
+        ),
+    ] = None,
+    bigquery_jobs: Annotated[
+        bool | None,
+        typer.Option(
+            "--bigquery-jobs/--no-bigquery-jobs",
+            help="Let jobs run BigQuery queries (ATTACH, bigquery_query); default: the deployment's",
+        ),
+    ] = None,
     project: Project = None,
     region: Region = None,
 ) -> None:
@@ -275,6 +289,8 @@ def init(
         name=name,
         ducklake=ducklake,
         network=network,
+        bigquery_datasets=tuple(bigquery_dataset) if bigquery_dataset else None,
+        bigquery_jobs=bigquery_jobs,
     )
     typer.echo(f"duckless init: {request.project} ({request.region})")
     status = _infra().init(request, lambda step: typer.echo(f"  - {step}"))
@@ -418,9 +434,27 @@ def preflight(
     raise typer.Exit(0 if report.ok else 1)
 
 
+def google_error_line(error: Exception) -> str:
+    """One line for a Google API or credentials error, instead of a traceback."""
+    from google.auth.exceptions import RefreshError
+
+    if isinstance(error, RefreshError):
+        return "your Google credentials expired: run `gcloud auth login --update-adc`"
+    message = str(getattr(error, "message", "") or error).strip().splitlines()[0][:300]
+    return f"{type(error).__name__}: {message} (DUCKLESS_DEBUG=1 for the full trace; retry if it is transient)"
+
+
 def main() -> None:
+    from google.api_core.exceptions import GoogleAPIError
+    from google.auth.exceptions import GoogleAuthError
+
     try:
         app()
     except DucklessError as e:
         typer.echo(f"error: {e}", err=True)
+        raise SystemExit(2) from e
+    except (GoogleAPIError, GoogleAuthError) as e:
+        if os.environ.get("DUCKLESS_DEBUG"):
+            raise
+        typer.echo(f"error: {google_error_line(e)}", err=True)
         raise SystemExit(2) from e

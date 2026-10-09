@@ -87,3 +87,24 @@ and on TPC-H SF100 DuckLess is as fast as BigQuery for ~20-80x less per run.
 - A Parquet file written by another tool (public cloud-samples-data) failed with DuckDB prefetch (bad page offsets): check with real client files.
 - `os.cpu_count()` over-reports on Cloud Run (9-10 for 8 vCPU): read the cgroup CPU quota.
 - JSON lines on stdout land as structured `jsonPayload` in Cloud Logging from Batch and Cloud Run.
+
+## Reading BigQuery (October 2026)
+
+Question: how should jobs read tables that live in BigQuery? TPC-H `lineitem` at scale 10 (60
+million rows, 10.5 GB logical) loaded into a dataset in `europe-west1`, read from DuckLess jobs.
+
+| Method | Machine | Aggregate, 2 columns | Whole table to GCS |
+| --- | --- | --- | --- |
+| `bigquery` extension, `bigquery_scan()` | `n2-highmem-16` | 1.8 s | 15.7 s |
+| `bigquery` extension, `bigquery_scan()` | Cloud Run, 8 vCPU | 6.8 s | 95 s |
+| Python, Storage Read API client, threads → Arrow → DuckDB | `n2-highmem-16` | 10.1 s | 57.5 s |
+| Python, Storage Read API client | Cloud Run, 8 vCPU | 18.5 s | 211 s |
+
+- The community `bigquery` extension (C++ client, Arrow, one stream per DuckDB thread, columns
+  and filter pushed to BigQuery) is 4 to 6 times faster than a Python client feeding DuckDB one
+  Arrow reader. `duckless_runtime.read_bigquery()` is a thin wrapper over it.
+- `bigquery_scan()` only needs `roles/bigquery.readSessionUser` (project) and
+  `roles/bigquery.dataViewer` (dataset). `ATTACH … (TYPE bigquery)` also needs
+  `roles/bigquery.jobUser`, and a plain `count(*)` through it took 46 s: not the default path.
+- Large reads are much slower on Cloud Run than on Batch, beyond the vCPU difference.
+- Storage Read API cost of the whole table: about one US cent.

@@ -15,6 +15,7 @@ from pathlib import Path
 
 import duckdb
 
+from duckless_runtime.bigquery import read_bigquery  # noqa: F401 (public API)
 from duckless_runtime.lake import attach_sql, lake_settings, start_proxy
 
 SCRATCH_DIR = Path(os.environ.get("DUCKLESS_SCRATCH_DIR", "/mnt/disks/scratch"))
@@ -121,6 +122,9 @@ def connect(database: str = ":memory:") -> duckdb.DuckDBPyConnection:
     con = duckdb.connect(database, config={"autoinstall_known_extensions": False})
     for statement in session_sql(settings):
         con.sql(statement)
+
+    # BigQuery reads (bigquery_scan, read_bigquery) without a LOAD in every job: 0.1 s.
+    con.sql("LOAD bigquery")
 
     lake = lake_settings(os.environ)
     if lake is not None:

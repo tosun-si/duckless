@@ -116,7 +116,8 @@ def init_infra(
     infra_sa = bootstrap.ensure_service_account(
         request.project, infra_service_account_id(request), "DuckLess infra (Infrastructure Manager)"
     )
-    if bootstrap.grant_project_roles(request.project, f"serviceAccount:{infra_sa}", infra_sa_roles(request.ducklake)):
+    roles = infra_sa_roles(request.ducklake, bool(request.bigquery_datasets))
+    if bootstrap.grant_project_roles(request.project, f"serviceAccount:{infra_sa}", roles):
         on_step("waiting for the new IAM grants to propagate")
         wait_for_iam()
 
@@ -162,7 +163,9 @@ def destroy_infra(
 
     on_step("removing the Infra Manager service account and the staging bucket")
     infra_sa = f"{infra_service_account_id(request)}@{request.project}.iam.gserviceaccount.com"
-    bootstrap.revoke_project_roles(request.project, f"serviceAccount:{infra_sa}", infra_sa_roles(ducklake=True))
+    bootstrap.revoke_project_roles(
+        request.project, f"serviceAccount:{infra_sa}", infra_sa_roles(ducklake=True, bigquery=True)
+    )
     bootstrap.delete_service_account(request.project, infra_sa)
     bootstrap.delete_bucket(staging_bucket(request))
     return status

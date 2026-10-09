@@ -20,6 +20,8 @@ Deploys or upgrades DuckLess in a project with Infrastructure Manager and prints
 | `--name` | `duckless` | prefix of the created resources |
 | `--ducklake` / `--no-ducklake` | the deployment's (off for a new one) | DuckLake catalog on Cloud SQL, see [DuckLake tables](/duckless/guides/ducklake/) |
 | `--network` | the deployment's (`default` for a new one) | VPC network of the jobs and of the catalog's private IP |
+| `--bigquery-dataset` | the deployment's (none for a new one) | BigQuery dataset of the project jobs may read, repeatable, see [Reading BigQuery](/duckless/guides/bigquery/) |
+| `--bigquery-jobs` / `--no-bigquery-jobs` | the deployment's (off for a new one) | let jobs run BigQuery queries (`bigquery_query`, `ATTACH`) |
 
 ### `duckless destroy`
 

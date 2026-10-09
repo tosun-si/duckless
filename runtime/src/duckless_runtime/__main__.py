@@ -31,6 +31,7 @@ ROW_STATEMENTS = frozenset({duckdb.StatementType.SELECT, duckdb.StatementType.PR
 
 # ---------- pure ----------
 
+
 def render(source: str, env: Mapping[str, str]) -> str:
     """${VAR} placeholders come from the job env; $1-style params are left alone."""
     return Template(source).safe_substitute(env)
@@ -50,6 +51,7 @@ def dir_size(path: Path) -> int:
 
 
 # ---------- effects ----------
+
 
 def spill_samples(path: Path, stop: threading.Event, every_s: float) -> Iterator[int]:
     while not stop.wait(every_s):
@@ -77,8 +79,13 @@ def run_statement(con: duckdb.DuckDBPyConnection, index: int, statement) -> dict
     preview = (
         tuple(tuple(map(str, row)) for row in con.fetchmany(PREVIEW_ROWS)) if statement.type in ROW_STATEMENTS else ()
     )
-    step = {"index": index, "type": statement.type.name, "sql": query[:200], "preview": preview,
-            "seconds": round(time.perf_counter() - started, 3)}
+    step = {
+        "index": index,
+        "type": statement.type.name,
+        "sql": query[:200],
+        "preview": preview,
+        "seconds": round(time.perf_counter() - started, 3),
+    }
     log("statement_done", **step)
     return step
 
@@ -101,7 +108,7 @@ def run_job(con: duckdb.DuckDBPyConnection, mode: str, uri: str, args: list[str]
         source = read_source(con, uri)
         outcome = run_sql(con, source) if mode == "sql" else run_python(source, args)
         return {"status": "succeeded", **outcome}
-    except Exception as e:  # noqa: BLE001 — report any failure, the caller exits non-zero
+    except Exception as e:
         error = f"{type(e).__name__}: {e}"
         log("job_failed", severity="ERROR", error=error)
         return {"status": "failed", "error": error}
