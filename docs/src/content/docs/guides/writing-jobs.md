@@ -152,7 +152,9 @@ Checking a raw file before using it is SQL too: each rule is one predicate DuckD
 whole file, and lines that do not fit the expected schema are caught by the CSV reader
 (`store_rejects`). Keep Python for the configuration, never for each row.
 [Example 03](https://github.com/tosun-si/duckless/tree/main/examples/03-raw-validation) checks
-100 million lines against YAML rules in about a minute and writes every error to GCS.
+100 million lines against YAML rules in about a minute and writes every error to GCS;
+[example 04](https://github.com/tosun-si/duckless/tree/main/examples/04-soda-contracts) runs the
+same checks as a Soda v4 data contract, through DuckDB.
 
 ## Writing to GCS fast
 
