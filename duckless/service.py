@@ -80,8 +80,12 @@ def preflight(
     return preflight_report(region, resolved, count, spot, quota_reader.regional_quotas(region))
 
 
+def _infra_email(request: InfraRequest) -> str:
+    return f"{infra_service_account_id(request)}@{request.project}.iam.gserviceaccount.com"
+
+
 def _infra_account(request: InfraRequest) -> str:
-    return f"serviceAccount:{infra_service_account_id(request)}@{request.project}.iam.gserviceaccount.com"
+    return f"serviceAccount:{_infra_email(request)}"
 
 
 def _grant_infra_roles(
@@ -173,7 +177,11 @@ def init_infra(
 def plan_destroy(request: InfraRequest, *, bootstrap: InfraBootstrap, deployer: InfraDeployer) -> DestroyPlan:
     current = deployer.get(request.project, request.region, deployment_id(request))
     bucket = (current.outputs.get("work_bucket") if current else None) or None
-    return destroy_plan(request.name, current, bool(bucket) and bootstrap.bucket_has_objects(bucket))
+    leftovers = current is None and (
+        bootstrap.service_account_exists(request.project, _infra_email(request))
+        or bootstrap.bucket_exists(staging_bucket(request))
+    )
+    return destroy_plan(request.name, current, bool(bucket) and bootstrap.bucket_has_objects(bucket), leftovers)
 
 
 def destroy_infra(
@@ -190,13 +198,18 @@ def destroy_infra(
     deleted = bootstrap.delete_cloud_run_jobs(request.project, request.region, runner_service_account(request))
     on_step(f"  {deleted} deleted")
     current = deployer.get(request.project, request.region, deployment_id(request))
-    on_step("giving the Infra Manager account its roles back for the deletion")
-    _grant_infra_roles(resolved_request(request, current), bootstrap, wait_for_iam, on_step)
-    on_step("deleting the Infra Manager deployment (a few minutes)")
-    status = deployer.destroy(request.project, request.region, deployment_id(request))
-    if not status.ok:
-        _revoke_infra_roles(request, bootstrap)
-        return status  # keep the infra SA (without roles): the next destroy needs it
+    if current is None:
+        # An earlier destroy stopped after deleting the deployment: finish what it left.
+        on_step("the deployment is already gone: removing what an interrupted destroy left")
+        status = InfraStatus(deployment_id(request), "DELETED")
+    else:
+        on_step("giving the Infra Manager account its roles back for the deletion")
+        _grant_infra_roles(resolved_request(request, current), bootstrap, wait_for_iam, on_step)
+        on_step("deleting the Infra Manager deployment (a few minutes)")
+        status = deployer.destroy(request.project, request.region, deployment_id(request))
+        if not status.ok:
+            _revoke_infra_roles(request, bootstrap)
+            return status  # keep the infra SA (without roles): the next destroy needs it
     if current and current.outputs.get("ducklake_instance"):
         network = current.outputs.get("network", "default")
         on_step(f"kept: the private services access of network '{network}', shared by every Cloud SQL instance on it")

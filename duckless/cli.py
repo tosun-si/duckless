@@ -339,7 +339,7 @@ def destroy(
             raise typer.Exit(1)
     elif not yes:
         typer.confirm(f"Delete the DuckLess installation '{name}' in {request.project}?", abort=True)
-    if force:
+    if force and plan.deployment_exists:  # never re-create a deployment that is already gone
         typer.echo("  - re-applying with force_destroy so the work bucket can be deleted")
         _infra().init(request, lambda step: typer.echo(f"    {step}"))
     status = _infra().destroy(request, lambda step: typer.echo(f"  - {step}"))
