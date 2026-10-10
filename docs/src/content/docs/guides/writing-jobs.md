@@ -147,7 +147,7 @@ it to the machine's local SSD with 64 parallel reads, then reading it there, is 
 from duckless_runtime import connect, stage_locally
 
 con = connect()
-journal = stage_locally("gs://my-bucket/exports/journal_2026-09.csv")   # local SSD path
+journal = stage_locally("gs://my-bucket/exports/journal_2026-09.csv")  # local SSD path
 con.sql(f"CREATE TABLE journal AS SELECT * FROM read_csv('{journal}', delim = ';')")
 ```
 
