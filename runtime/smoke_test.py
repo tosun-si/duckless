@@ -4,6 +4,7 @@ docker run --rm --entrypoint python <image> /usr/local/src/app/smoke_test.py
 """
 
 import subprocess
+from pathlib import Path
 
 import duckdb
 from duckless_runtime import (
@@ -16,6 +17,7 @@ from duckless_runtime import (
 )
 from duckless_runtime.bigquery import scan_sql
 from duckless_runtime.lake import PROXY, attach_sql, lake_settings
+from duckless_runtime.staging import local_path, ranges
 
 con = duckdb.connect(config={"autoinstall_known_extensions": False})
 installed = dict(con.sql("SELECT extension_name, installed FROM duckdb_extensions()").fetchall())
@@ -50,12 +52,13 @@ lake = lake_settings(
 )
 assert lake is not None and lake.user == "runner@p.iam" and "password" not in attach_sql(lake)
 assert lake_settings({}) is None
+assert ranges(130, 64) == [(0, 64), (64, 64), (128, 2)] and ranges(0) == []
+assert str(local_path("gs://b/journal/x.csv", Path("/ssd"))) == "/ssd/b/journal/x.csv"
 expected = "SELECT \"a\" FROM bigquery_scan('p.d.t', filter = 'x = ''y''')"
 assert scan_sql("p:d.t", ["a"], "x = 'y'") == expected
 for extension in ("excel", "avro", "iceberg", "bigquery"):
     con.sql(f"LOAD {extension}")
 con.sql("COPY (SELECT 1 AS a) TO '/tmp/smoke.xlsx' (FORMAT xlsx, HEADER true)")
 assert con.sql("SELECT a FROM read_xlsx('/tmp/smoke.xlsx')").fetchone()[0] == 1
-print(
-    f"smoke ok: duckdb {duckdb.__version__}, gcs, tpch, ducklake, postgres, excel, avro, iceberg, bigquery, proxy, no httpfs"
-)
+extensions = "gcs, tpch, ducklake, postgres, excel, avro, iceberg, bigquery"
+print(f"smoke ok: duckdb {duckdb.__version__}, {extensions}, proxy, no httpfs")

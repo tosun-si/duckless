@@ -137,6 +137,31 @@ Every format below reads and writes on `gs://` like local files, with the job's 
 | Iceberg | `iceberg_scan` (`LOAD iceberg`) | | |
 | BigQuery tables | `bigquery_scan`, `read_bigquery()` | | see [Reading BigQuery](/duckless/guides/bigquery/) |
 
+### One big file: copy it to the local disk first
+
+GCS gives about 100 MB/s per read stream, so one big file is read as fast as the number of ranges
+fetched at once. The runner fetches 32 (DuckDB's default is 5); for a big file read in full, copying
+it to the machine's local SSD with 64 parallel reads, then reading it there, is faster still:
+
+```python
+from duckless_runtime import connect, stage_locally
+
+con = connect()
+journal = stage_locally("gs://my-bucket/exports/journal_2026-09.csv")  # local SSD path
+con.sql(f"CREATE TABLE journal AS SELECT * FROM read_csv('{journal}', delim = ';')")
+```
+
+Measured on a 11.7 GB CSV (100 million lines) on `n2-highmem-32`, loading it into a table:
+
+| Read | Time |
+| --- | --- |
+| `read_csv('gs://…')`, DuckDB's default (5 parallel reads) | 80 s (HTTP) to 130 s (gRPC) |
+| `read_csv('gs://…')`, runner default (32) | 37 s to 45 s |
+| `stage_locally()` then `read_csv` on the local SSD | 14 s to 15 s |
+
+On Cloud Run there is no local disk: the copy lands in memory (`/tmp`). Parquet read in place
+already skips what a query does not need: copying first rarely helps there.
+
 Text formats cost a full parse on every read. When a job reads the same CSV or JSON more than
 once, convert it once to Parquet (or a [DuckLake](/duckless/guides/ducklake/) table) and query
 that: [example 02](https://github.com/tosun-si/duckless/tree/main/examples/02-ducklake-incremental)

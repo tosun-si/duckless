@@ -38,6 +38,7 @@ Settings you can pass with `--env`:
 | Variable | Default | |
 | --- | --- | --- |
 | `DUCKLESS_MEMORY_FRACTION` | `0.8` | share of the VM memory given to DuckDB |
+| `DUCKLESS_GCS_TRANSFER_CONCURRENCY` | `32` | ranges of one GCS object fetched at once (DuckDB's default is 5) |
 | `DUCKLESS_GCS_GRPC` | `true` (`false` on Cloud Run Jobs) | GCS over gRPC; `false` for HTTP |
 | `DUCKLESS_THREADS` | the VM's vCPUs (the job's vCPUs on Cloud Run Jobs) | DuckDB threads |
 | `DUCKLESS_SCRATCH_DIR` | `/mnt/disks/scratch` | where local SSD is mounted (spill goes under it) |

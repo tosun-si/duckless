@@ -35,6 +35,9 @@ log("done", rows=123)  # structured log line, visible in `duckless logs`
 
 - **Never install or load `httpfs`.** The runner serves `gs://` with the `gcs` extension and
   the job's service account. httpfs would take `gs://` over and fail on credentials.
+- **One big file (CSV, JSON) read in full: `stage_locally('gs://…')` first.** GCS gives ~100 MB/s per
+  stream; the runner fetches 32 ranges at once, and copying to the local SSD with 64 then reading
+  locally loaded a 12 GB CSV in 15 s instead of 130 s. Not for Cloud Run (no disk) nor Parquet.
 - **Parallel writes.** A single Parquet writer caps around 110 MB/s to GCS; `PER_THREAD_OUTPUT`
   reached about 900 MB/s on 32 vCPU. `copy_to_parquet()` does it for Python.
 - **No row-by-row Python UDFs.** They run around 8k rows/s. Use vectorized ones
