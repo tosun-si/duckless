@@ -31,7 +31,14 @@ Deletes what `init` created.
 | --- | --- | --- |
 | `--name` | `duckless` | prefix given to `init` |
 | `--force` | off | also delete a work bucket that still holds objects, and the DuckLake catalog |
-| `--yes` | off | do not ask for confirmation |
+| `--yes` | off | do not ask for confirmation (not enough when the installation has a DuckLake catalog) |
+| `--confirm-name` | none | the installation name, to delete a DuckLake catalog without the typed prompt (scripts) |
+
+`destroy` checks first and stops before deleting anything when the work bucket holds objects or a
+DuckLake catalog exists, unless `--force`. It lists what it deletes; with a catalog, it asks you to
+type the installation's name. Your data buckets and BigQuery datasets are never deleted. Teams that
+apply the [Terraform module](/duckless/guides/infrastructure/#your-terraform) themselves remove it
+with their own Terraform instead.
 
 ## Jobs
 

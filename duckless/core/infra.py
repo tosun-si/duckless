@@ -25,10 +25,29 @@ INFRA_SA_ROLES = (
     "roles/artifactregistry.admin",
     "roles/config.agent",
     "roles/iam.serviceAccountAdmin",
-    "roles/resourcemanager.projectIamAdmin",
     "roles/serviceusage.serviceUsageAdmin",
     "roles/storage.admin",
 )
+
+# Project roles the module grants the runner account: the only roles the Infrastructure Manager
+# account may grant, through a condition on its project IAM admin role.
+RUNNER_PROJECT_ROLES = (
+    "roles/batch.agentReporter",
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter",
+    "roles/cloudsql.client",
+    "roles/cloudsql.instanceUser",
+    "roles/bigquery.readSessionUser",
+    "roles/bigquery.jobUser",
+)
+IAM_ADMIN_ROLE = "roles/resourcemanager.projectIamAdmin"
+RUNNER_GRANTS_ONLY = {
+    "title": "duckless-runner-roles-only",
+    "description": "Grant or revoke only the project roles of the DuckLess runner account",
+    "expression": "api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly(["
+    + ", ".join(f"'{r}'" for r in RUNNER_PROJECT_ROLES)
+    + "])",
+}
 
 # Only with DuckLake: the catalog instance (the network peering is set up by `init` itself).
 CATALOG_INFRA_SA_ROLES = ("roles/cloudsql.admin",)
@@ -172,30 +191,115 @@ def deployment_inputs(request: InfraRequest) -> dict[str, Any]:
     }
 
 
-def with_bindings(policy: Mapping[str, Any], member: str, roles: tuple[str, ...]) -> tuple[dict[str, Any], bool]:
-    """IAM policy with `member` added to each role (unconditional bindings); True when it changed."""
+def _matches(binding: Mapping[str, Any], role: str, condition: Mapping[str, str] | None) -> bool:
+    """Same role, and the same condition (none, or the one with this title)."""
+    if binding["role"] != role:
+        return False
+    if condition is None:
+        return "condition" not in binding
+    return binding.get("condition", {}).get("title") == condition["title"]
+
+
+def _version(policy: Mapping[str, Any], condition: Mapping[str, str] | None) -> int:
+    # Conditional bindings need policy version 3.
+    return max(int(policy.get("version", 1)), 3 if condition else 1)
+
+
+def with_bindings(
+    policy: Mapping[str, Any], member: str, roles: tuple[str, ...], condition: Mapping[str, str] | None = None
+) -> tuple[dict[str, Any], bool]:
+    """IAM policy with `member` added to each role, under `condition` if given; True when it changed."""
     bindings = [dict(b) for b in policy.get("bindings", [])]
-    unconditional = {b["role"]: b for b in bindings if "condition" not in b}
-    missing = [r for r in roles if member not in unconditional.get(r, {}).get("members", [])]
+    missing = [r for r in roles if not any(_matches(b, r, condition) and member in b["members"] for b in bindings)]
     if not missing:
         return dict(policy), False
+    existing = {r for r in missing if any(_matches(b, r, condition) for b in bindings)}
     updated = [
-        {**b, "members": [*b["members"], member]} if "condition" not in b and b["role"] in missing else b
+        {**b, "members": [*b["members"], member]} if any(_matches(b, r, condition) for r in existing) else b
         for b in bindings
     ]
-    new = [{"role": r, "members": [member]} for r in missing if r not in unconditional]
-    return {**policy, "bindings": updated + new, "version": max(int(policy.get("version", 1)), 1)}, True
+    new = [
+        {"role": r, "members": [member], **({"condition": dict(condition)} if condition else {})}
+        for r in missing
+        if r not in existing
+    ]
+    return {**policy, "bindings": updated + new, "version": _version(policy, condition)}, True
 
 
-def without_bindings(policy: Mapping[str, Any], member: str, roles: tuple[str, ...]) -> tuple[dict[str, Any], bool]:
-    """IAM policy with `member` removed from each role (unconditional bindings); True when it changed."""
+def without_bindings(
+    policy: Mapping[str, Any], member: str, roles: tuple[str, ...], condition: Mapping[str, str] | None = None
+) -> tuple[dict[str, Any], bool]:
+    """IAM policy with `member` removed from each role (under `condition` if given); True when it changed."""
     bindings = [dict(b) for b in policy.get("bindings", [])]
-    targeted = [b for b in bindings if "condition" not in b and b["role"] in roles and member in b["members"]]
+    targeted = [b for b in bindings if any(_matches(b, r, condition) for r in roles) and member in b["members"]]
     if not targeted:
         return dict(policy), False
     updated = [{**b, "members": [m for m in b["members"] if m != member]} if b in targeted else b for b in bindings]
-    return {**policy, "bindings": [b for b in updated if b["members"]]}, True
+    return {**policy, "bindings": [b for b in updated if b["members"]], "version": _version(policy, condition)}, True
 
 
 def envrc_lines(status: InfraStatus) -> list[str]:
     return [line.strip() for line in str(status.outputs.get("envrc", "")).splitlines() if line.strip()]
+
+
+@dataclass(frozen=True, slots=True)
+class DestroyPlan:
+    """What `duckless destroy` would delete, read before anything is touched."""
+
+    name: str
+    deployment_exists: bool
+    work_bucket: str | None = None
+    work_bucket_has_objects: bool = False
+    catalog_instance: str | None = None
+
+
+def destroy_plan(name: str, current: InfraStatus | None, work_bucket_has_objects: bool) -> DestroyPlan:
+    outputs = current.outputs if current else {}
+    return DestroyPlan(
+        name=name,
+        deployment_exists=current is not None,
+        work_bucket=outputs.get("work_bucket") or None,
+        work_bucket_has_objects=work_bucket_has_objects,
+        catalog_instance=outputs.get("ducklake_instance") or None,
+    )
+
+
+def destroy_blockers(plan: DestroyPlan, force: bool) -> tuple[str, ...]:
+    """Why destroy refuses to start; empty when it may go on."""
+    if not plan.deployment_exists:
+        return (f"no DuckLess installation '{plan.name}' here (check --name, --project, --region)",)
+    if force:
+        return ()
+    return tuple(
+        reason
+        for reason in (
+            f"the work bucket {plan.work_bucket} still holds objects" if plan.work_bucket_has_objects else None,
+            f"the installation has a DuckLake catalog ({plan.catalog_instance}): deleting it deletes the lake's tables"
+            if plan.catalog_instance
+            else None,
+        )
+        if reason
+    )
+
+
+def destroy_summary(plan: DestroyPlan) -> list[str]:
+    lines = [f"duckless destroy '{plan.name}' deletes:"]
+    if plan.work_bucket:
+        objects = " and everything in it" if plan.work_bucket_has_objects else " (empty)"
+        lines.append(f"  - the work bucket {plan.work_bucket}{objects}")
+    if plan.catalog_instance:
+        lines.append(
+            f"  - the DuckLake catalog {plan.catalog_instance}: the lake's tables (the Parquet files stay in the "
+            "bucket only if it is kept; a final backup of the catalog is kept 30 days by default)"
+        )
+    lines += [
+        "  - the runner service account, the image repository, the Cloud Run jobs of past runs",
+        "  - the Infrastructure Manager account and its staging bucket",
+        "  kept: your data buckets and BigQuery datasets, enabled APIs, the network peering",
+    ]
+    return lines
+
+
+def needs_typed_name(plan: DestroyPlan) -> bool:
+    """Deleting a lake takes typing the installation's name: --yes alone is not enough."""
+    return plan.catalog_instance is not None

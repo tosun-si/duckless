@@ -13,10 +13,14 @@ from duckless.core.errors import DucklessError
 from duckless.core.infra import (
     BOOTSTRAP_APIS,
     CATALOG_BOOTSTRAP_APIS,
+    IAM_ADMIN_ROLE,
+    RUNNER_GRANTS_ONLY,
+    DestroyPlan,
     InfraRequest,
     InfraStatus,
     deployment_id,
     deployment_inputs,
+    destroy_plan,
     infra_sa_roles,
     infra_service_account_id,
     module_prefix,
@@ -76,6 +80,32 @@ def preflight(
     return preflight_report(region, resolved, count, spot, quota_reader.regional_quotas(region))
 
 
+def _infra_account(request: InfraRequest) -> str:
+    return f"serviceAccount:{infra_service_account_id(request)}@{request.project}.iam.gserviceaccount.com"
+
+
+def _grant_infra_roles(
+    request: InfraRequest, bootstrap: InfraBootstrap, wait_for_iam: Callable[[], None], on_step: Callable[[str], None]
+) -> None:
+    """The Infrastructure Manager account gets its roles only while it applies or deletes."""
+    member = _infra_account(request)
+    roles = infra_sa_roles(bool(request.ducklake), bool(request.bigquery_datasets))
+    changed = bootstrap.grant_project_roles(request.project, member, roles)
+    # Project IAM admin, but only to grant or revoke the runner's roles: never Owner, never anyone else's.
+    changed = bootstrap.grant_project_roles(request.project, member, (IAM_ADMIN_ROLE,), RUNNER_GRANTS_ONLY) or changed
+    if changed:
+        on_step("waiting for the new IAM grants to propagate")
+        wait_for_iam()
+
+
+def _revoke_infra_roles(request: InfraRequest, bootstrap: InfraBootstrap) -> None:
+    member = _infra_account(request)
+    # Every role it may hold, including the unconditional IAM admin of DuckLess 0.4.0 and earlier.
+    roles = (*infra_sa_roles(ducklake=True, bigquery=True), IAM_ADMIN_ROLE)
+    bootstrap.revoke_project_roles(request.project, member, roles)
+    bootstrap.revoke_project_roles(request.project, member, (IAM_ADMIN_ROLE,), RUNNER_GRANTS_ONLY)
+
+
 def init_infra(
     request: InfraRequest,
     *,
@@ -116,32 +146,43 @@ def init_infra(
     infra_sa = bootstrap.ensure_service_account(
         request.project, infra_service_account_id(request), "DuckLess infra (Infrastructure Manager)"
     )
-    roles = infra_sa_roles(request.ducklake, bool(request.bigquery_datasets))
-    if bootstrap.grant_project_roles(request.project, f"serviceAccount:{infra_sa}", roles):
-        on_step("waiting for the new IAM grants to propagate")
-        wait_for_iam()
+    _grant_infra_roles(request, bootstrap, wait_for_iam, on_step)
+    try:
+        on_step(f"uploading the Terraform module {version}")
+        bucket = staging_bucket(request)
+        bootstrap.ensure_bucket(request.project, request.region, bucket)
+        source = bootstrap.upload_directory(module_dir, bucket, module_prefix(version))
 
-    on_step(f"uploading the Terraform module {version}")
-    bucket = staging_bucket(request)
-    bootstrap.ensure_bucket(request.project, request.region, bucket)
-    source = bootstrap.upload_directory(module_dir, bucket, module_prefix(version))
+        on_step(
+            "applying with Infrastructure Manager (a few minutes"
+            + (", ~10 more for Cloud SQL)" if request.ducklake else ")")
+        )
+        return deployer.apply(
+            request.project,
+            request.region,
+            deployment_id(request),
+            source,
+            deployment_inputs(request),
+            infra_sa,
+        )
+    finally:
+        on_step("removing the Infra Manager account's roles (given back by the next init or destroy)")
+        _revoke_infra_roles(request, bootstrap)
 
-    on_step(
-        "applying with Infrastructure Manager (a few minutes"
-        + (", ~10 more for Cloud SQL)" if request.ducklake else ")")
-    )
-    return deployer.apply(
-        request.project,
-        request.region,
-        deployment_id(request),
-        source,
-        deployment_inputs(request),
-        infra_sa,
-    )
+
+def plan_destroy(request: InfraRequest, *, bootstrap: InfraBootstrap, deployer: InfraDeployer) -> DestroyPlan:
+    current = deployer.get(request.project, request.region, deployment_id(request))
+    bucket = (current.outputs.get("work_bucket") if current else None) or None
+    return destroy_plan(request.name, current, bool(bucket) and bootstrap.bucket_has_objects(bucket))
 
 
 def destroy_infra(
-    request: InfraRequest, *, bootstrap: InfraBootstrap, deployer: InfraDeployer, on_step: Callable[[str], None]
+    request: InfraRequest,
+    *,
+    bootstrap: InfraBootstrap,
+    deployer: InfraDeployer,
+    on_step: Callable[[str], None],
+    wait_for_iam: Callable[[], None] = lambda: None,
 ) -> InfraStatus:
     """Deletes the Cloud Run jobs of past runs, the deployment, then what `init` created outside
     Terraform (infra SA, its grants, staging)."""
@@ -149,10 +190,13 @@ def destroy_infra(
     deleted = bootstrap.delete_cloud_run_jobs(request.project, request.region, runner_service_account(request))
     on_step(f"  {deleted} deleted")
     current = deployer.get(request.project, request.region, deployment_id(request))
+    on_step("giving the Infra Manager account its roles back for the deletion")
+    _grant_infra_roles(resolved_request(request, current), bootstrap, wait_for_iam, on_step)
     on_step("deleting the Infra Manager deployment (a few minutes)")
     status = deployer.destroy(request.project, request.region, deployment_id(request))
     if not status.ok:
-        return status  # keep the infra SA: it is needed to retry the deletion
+        _revoke_infra_roles(request, bootstrap)
+        return status  # keep the infra SA (without roles): the next destroy needs it
     if current and current.outputs.get("ducklake_instance"):
         network = current.outputs.get("network", "default")
         on_step(f"kept: the private services access of network '{network}', shared by every Cloud SQL instance on it")
@@ -163,9 +207,7 @@ def destroy_infra(
 
     on_step("removing the Infra Manager service account and the staging bucket")
     infra_sa = f"{infra_service_account_id(request)}@{request.project}.iam.gserviceaccount.com"
-    bootstrap.revoke_project_roles(
-        request.project, f"serviceAccount:{infra_sa}", infra_sa_roles(ducklake=True, bigquery=True)
-    )
+    _revoke_infra_roles(request, bootstrap)
     bootstrap.delete_service_account(request.project, infra_sa)
     bootstrap.delete_bucket(staging_bucket(request))
     return status

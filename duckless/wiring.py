@@ -14,7 +14,7 @@ from importlib import metadata, resources
 from pathlib import Path
 
 from duckless import service
-from duckless.core.infra import InfraRequest, InfraStatus
+from duckless.core.infra import DestroyPlan, InfraRequest, InfraStatus
 from duckless.core.job import JobReport, JobRequest, JobStatus, LogLine
 from duckless.core.lake import lake_env
 from duckless.core.preflight import PreflightReport
@@ -105,6 +105,7 @@ IAM_PROPAGATION_SECONDS = 60
 class InfraServices:
     init: Callable[[InfraRequest, Callable[[str], None]], InfraStatus]
     destroy: Callable[[InfraRequest, Callable[[str], None]], InfraStatus]
+    plan_destroy: Callable[[InfraRequest], DestroyPlan]
 
 
 def module_dir() -> Path:
@@ -148,6 +149,13 @@ def gcp_infra_services() -> InfraServices:
             wait_for_iam=lambda: time.sleep(IAM_PROPAGATION_SECONDS),
         ),
         destroy=lambda request, on_step: service.destroy_infra(
-            request, bootstrap=bootstrap(request.project), deployer=deployer(), on_step=on_step
+            request,
+            bootstrap=bootstrap(request.project),
+            deployer=deployer(),
+            on_step=on_step,
+            wait_for_iam=lambda: time.sleep(IAM_PROPAGATION_SECONDS),
+        ),
+        plan_destroy=lambda request: service.plan_destroy(
+            request, bootstrap=bootstrap(request.project), deployer=deployer()
         ),
     )

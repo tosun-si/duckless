@@ -1,12 +1,59 @@
 ---
 title: Infrastructure
-description: What duckless init creates in your project, the permissions involved, and how to remove it.
+description: The resources DuckLess needs, created by your own Terraform or by duckless init, the permissions involved, and how to remove them.
 ---
+
+DuckLess needs a few resources in the project where jobs run: a work bucket, a runner service
+account with its roles, access to the runner image, and optionally a DuckLake catalog and BigQuery
+read access. They all come from **one Terraform module**, shipped with each release.
+
+**`duckless init` is not required.** The CLI only reads the settings the module outputs
+(`DUCKLESS_PROJECT`, `DUCKLESS_BUCKET`, `DUCKLESS_SA`, `DUCKLESS_IMAGE`…); how the resources were
+created does not matter. Two ways to create them:
+
+| | Your Terraform (recommended for teams) | `duckless init` (quick start) |
+| --- | --- | --- |
+| Applied by | your CI/CD, with your deployment identity | Infrastructure Manager, with an account `init` creates |
+| When | in your pipeline, reviewed like the rest of your infrastructure | when someone runs the command |
+| Extra identity in the project | none | `duckless-infra`, with roles only while `init` or `destroy` runs |
+| Checks before applying | your plan | organization policies, network peering for DuckLake |
+
+## Your Terraform
+
+```hcl
+module "duckless" {
+  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.4.1"
+
+  project_id        = "my-project"
+  region            = "europe-west1"
+  runner_image_tag  = "0.4.1"
+  data_buckets      = ["my-lake"]
+  bigquery_datasets = ["sales"]
+}
+
+output "envrc" {
+  value = module.duckless.envrc
+}
+```
+
+- Inputs, outputs and requirements: the [module README](https://github.com/tosun-si/duckless/tree/main/duckless/terraform).
+- Building the resources with your own modules instead: [Requirements](/duckless/reference/requirements/) lists every
+  resource, API and role, with why.
+- A complete caller, with DuckLake on a Shared VPC:
+  [`examples/terraform`](https://github.com/tosun-si/duckless/blob/main/examples/terraform/main.tf).
+- Provider: the module needs `hashicorp/google >= 7.18` and is checked in CI with 7.18.0 and the
+  latest release. Your lock file decides the exact version; a DuckLess release that raises the
+  minimum says so.
+- Upgrading: bump `ref` and `runner_image_tag` to the new version, plan, apply.
+- DuckLake: the network needs private services access, which your network code (or the Shared
+  VPC) provides; the module does not manage it.
+
+## duckless init
 
 `duckless init` sets up a project once; jobs reuse it. It is safe to run again: that is how
 you upgrade after installing a newer CLI.
 
-## What init does
+### What init does
 
 1. Enables the APIs Infrastructure Manager needs (`config`, `iam`, `cloudresourcemanager`,
    `serviceusage`, `storage`).
@@ -35,9 +82,18 @@ The job VMs' account, `duckless-runner`, gets only:
 - `roles/storage.objectUser` on the work bucket and on each `--data-bucket`;
 - `roles/artifactregistry.reader` on the image repository.
 
-The Infrastructure Manager account, `duckless-infra`, has admin roles on Artifact Registry,
-Storage, service accounts, project IAM and service usage: it is what lets Terraform create
-the resources above. It is removed by `duckless destroy`.
+The Infrastructure Manager account, `duckless-infra`, is what lets Terraform create the resources
+above. It **holds roles only while `init` or `destroy` runs**: `init` grants them, applies, and
+revokes them, even when the apply fails; `destroy` grants them back for the deletion. Between two
+runs it has no role in the project.
+
+While it runs, it has admin roles on Artifact Registry, Storage, service accounts and service usage
+(and Cloud SQL with DuckLake, BigQuery data with `--bigquery-dataset`), and project IAM admin
+**under a condition**: it can only grant or revoke the runner's roles (batch, logging, monitoring,
+Cloud SQL client, BigQuery read). Granting any other role, Owner included, is refused. The account
+itself is deleted by `duckless destroy`.
+
+With your own Terraform, none of this exists: your deployment identity applies the module.
 
 To let jobs read or write other buckets, list them at init time:
 
@@ -81,6 +137,8 @@ The second run updates the deployment with the module and runner image of the ne
 
 ## Removing everything
 
+With your own Terraform: remove the module (or `terraform destroy`). With `init`:
+
 ```bash
 duckless destroy --project my-project --force
 ```
@@ -89,21 +147,3 @@ duckless destroy --project my-project --force
 runner account), the deployment (bucket, service account, repository), then the
 Infrastructure Manager account, its grants and the staging bucket. `--force` is needed when
 the work bucket still holds objects. Enabled APIs stay enabled.
-
-## Using the Terraform module directly
-
-Teams that manage their infrastructure as code can use the module instead of `init`:
-
-```hcl
-module "duckless" {
-  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.4.0"
-
-  project_id   = "my-project"
-  region       = "europe-west1"
-  data_buckets = ["my-lake"]
-}
-
-output "envrc" {
-  value = module.duckless.envrc
-}
-```

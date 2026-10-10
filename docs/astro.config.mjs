@@ -47,6 +47,7 @@ export default defineConfig({
 					items: [
 						{ label: 'CLI', slug: 'reference/cli' },
 						{ label: 'Configuration', slug: 'reference/configuration' },
+						{ label: 'Requirements', slug: 'reference/requirements' },
 						{ label: 'Architecture', slug: 'reference/architecture' },
 					],
 				},
