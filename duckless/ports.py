@@ -64,7 +64,9 @@ class InfraBootstrap(Protocol):
         """Returns the service account email."""
         ...
 
-    def grant_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> bool:
+    def grant_project_roles(
+        self, project: str, member: str, roles: tuple[str, ...], condition: Mapping[str, str] | None = None
+    ) -> bool:
         """True when the project IAM policy changed (new grants take a while to propagate)."""
         ...
 
@@ -74,7 +76,9 @@ class InfraBootstrap(Protocol):
         """Returns the gs:// URI of the uploaded directory."""
         ...
 
-    def revoke_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> None: ...
+    def revoke_project_roles(
+        self, project: str, member: str, roles: tuple[str, ...], condition: Mapping[str, str] | None = None
+    ) -> None: ...
 
     def delete_service_account(self, project: str, email: str) -> None:
         """No-op when it does not exist."""
@@ -94,6 +98,10 @@ class InfraBootstrap(Protocol):
 
     def delete_bucket(self, bucket: str) -> None:
         """Deletes its objects too; no-op when it does not exist."""
+        ...
+
+    def bucket_has_objects(self, bucket: str) -> bool:
+        """False when the bucket is empty or does not exist."""
         ...
 
 

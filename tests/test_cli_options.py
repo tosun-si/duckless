@@ -4,7 +4,7 @@ import pytest
 from typer.testing import CliRunner
 
 from duckless import cli
-from duckless.core.infra import InfraRequest, InfraStatus
+from duckless.core.infra import DestroyPlan, InfraRequest, InfraStatus
 from duckless.wiring import InfraServices
 
 ENV = {"DUCKLESS_BUCKET": "b", "DUCKLESS_SA": "sa", "DUCKLESS_IMAGE": "img"}
@@ -19,7 +19,13 @@ def init_requests(monkeypatch: pytest.MonkeyPatch) -> list[InfraRequest]:
         return InfraStatus("d", "ACTIVE", {"envrc": "export DUCKLESS_PROJECT=p"})
 
     monkeypatch.setattr(
-        cli, "_infra", lambda: InfraServices(init=init, destroy=lambda r, s: InfraStatus("d", "DELETED"))
+        cli,
+        "_infra",
+        lambda: InfraServices(
+            init=init,
+            destroy=lambda r, s: InfraStatus("d", "DELETED"),
+            plan_destroy=lambda r: DestroyPlan(r.name, deployment_exists=True),
+        ),
     )
     return requests
 

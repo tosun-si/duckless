@@ -45,6 +45,24 @@ jobs:
       - run: terraform fmt -check -recursive
       - run: terraform init -backend=false -input=false && terraform validate
 
+  # The module as teams call it (examples/terraform), with the oldest google provider it declares
+  # and the newest: a module that only works on the latest provider would break their pipelines.
+  terraform-providers:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        provider: ["= 7.18.0", ">= 7.18"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+      - name: Validate the caller example
+        run: |
+          mkdir -p /tmp/caller && cp examples/terraform/main.tf /tmp/caller/
+          sed -i "s|git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=[^\"]*|$GITHUB_WORKSPACE/duckless/terraform|" /tmp/caller/main.tf
+          sed -i 's|version = ">= 7.18" # your lock file pins the exact version|version = "${{ matrix.provider }}"|' /tmp/caller/main.tf
+          grep -n 'source *=\|version *=' /tmp/caller/main.tf
+          cd /tmp/caller && terraform init -backend=false -input=false && terraform validate
+
   runner-image:
     needs: lint-and-test
     runs-on: ubuntu-latest

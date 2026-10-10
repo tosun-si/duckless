@@ -2,6 +2,7 @@
 storage client for the staging bucket."""
 
 import time
+from collections.abc import Mapping
 from pathlib import Path
 
 from google.auth.transport.requests import AuthorizedSession
@@ -119,11 +120,15 @@ class GcpInfraBootstrap:
         response.raise_for_status()
         return True
 
-    def grant_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> bool:
-        return self._update_policy(project, lambda policy: with_bindings(policy, member, roles))
+    def grant_project_roles(
+        self, project: str, member: str, roles: tuple[str, ...], condition: Mapping[str, str] | None = None
+    ) -> bool:
+        return self._update_policy(project, lambda policy: with_bindings(policy, member, roles, condition))
 
-    def revoke_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> None:
-        self._update_policy(project, lambda policy: without_bindings(policy, member, roles))
+    def revoke_project_roles(
+        self, project: str, member: str, roles: tuple[str, ...], condition: Mapping[str, str] | None = None
+    ) -> None:
+        self._update_policy(project, lambda policy: without_bindings(policy, member, roles, condition))
 
     def delete_service_account(self, project: str, email: str) -> None:
         response = self._request("DELETE", f"{IAM}/projects/{project}/serviceAccounts/{email}")
@@ -181,6 +186,11 @@ class GcpInfraBootstrap:
         for operation in [client.delete_job(name=name) for name in jobs]:
             operation.result()
         return len(jobs)
+
+    def bucket_has_objects(self, bucket: str) -> bool:
+        if self._storage.lookup_bucket(bucket) is None:
+            return False
+        return next(iter(self._storage.list_blobs(bucket, max_results=1)), None) is not None
 
     def delete_bucket(self, bucket: str) -> None:
         existing = self._storage.lookup_bucket(bucket)

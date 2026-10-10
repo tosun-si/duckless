@@ -23,6 +23,11 @@ output "ducklake_data_path" {
   value       = var.ducklake ? local.ducklake_data : ""
 }
 
+output "subnetwork" {
+  description = "Subnetwork of the jobs."
+  value       = var.subnetwork
+}
+
 output "network" {
   description = "VPC network of the jobs (and of the catalog's private IP)."
   value       = var.network
@@ -37,6 +42,7 @@ output "envrc" {
     export DUCKLESS_SA=${google_service_account.runner.email}
     export DUCKLESS_IMAGE=${local.runner_image}
     export DUCKLESS_NETWORK=${var.network}
+    export DUCKLESS_SUBNETWORK=${var.subnetwork}
   %{~if var.ducklake}
     export DUCKLESS_DUCKLAKE_INSTANCE=${google_sql_database_instance.catalog[0].connection_name}
     export DUCKLESS_DUCKLAKE_DATA_PATH=${local.ducklake_data}

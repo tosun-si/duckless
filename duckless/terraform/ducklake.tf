@@ -15,7 +15,7 @@ locals {
   catalog_user  = trimsuffix(google_service_account.runner.email, ".gserviceaccount.com")
   catalog_db    = "ducklake"
   ducklake_data = "gcss://${google_storage_bucket.work.name}/lake/"
-  network_id    = "projects/${var.project_id}/global/networks/${var.network}"
+  network_id    = startswith(var.network, "projects/") ? var.network : "projects/${var.project_id}/global/networks/${var.network}"
 }
 
 resource "google_project_service" "ducklake" {
@@ -52,6 +52,12 @@ resource "google_sql_database_instance" "catalog" {
     database_flags {
       name  = "cloudsql.iam_authentication"
       value = "on"
+    }
+
+    # Deleting a Cloud SQL instance deletes its automated backups: keep a final one.
+    final_backup_config {
+      enabled        = true
+      retention_days = var.catalog_final_backup_days
     }
 
     # The catalog is the lake: without it the Parquet files on GCS are unreadable as tables.

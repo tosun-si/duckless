@@ -9,7 +9,10 @@ from duckless.adapters.gcp_bootstrap import GcpInfraBootstrap, is_unknown_member
 from duckless.adapters.infra_manager import build_deployment, deployment_name
 from duckless.cli import infra_lines
 from duckless.core.infra import (
+    IAM_ADMIN_ROLE,
     INFRA_SA_ROLES,
+    RUNNER_GRANTS_ONLY,
+    RUNNER_PROJECT_ROLES,
     InfraRequest,
     InfraStatus,
     InvalidInfraRequestError,
@@ -47,9 +50,12 @@ class FakeBootstrap:
         self.calls.append(f"sa:{account_id}")
         return f"{account_id}@{project}.iam.gserviceaccount.com"
 
-    def grant_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> bool:
-        self.calls.append(f"grant:{member}")
-        self.granted_roles = roles
+    def grant_project_roles(self, project: str, member: str, roles: tuple[str, ...], condition=None) -> bool:
+        self.calls.append(f"grant:{member}" + (f":if:{condition['title']}" if condition else ""))
+        if condition is None:
+            self.granted_roles = roles
+        else:
+            self.conditional_grants = (roles, condition)
         return self.policy_changes
 
     def ensure_bucket(self, project: str, region: str, bucket: str) -> None:
@@ -59,8 +65,9 @@ class FakeBootstrap:
         self.calls.append(f"upload:{prefix}")
         return f"gs://{bucket}/{prefix}"
 
-    def revoke_project_roles(self, project: str, member: str, roles: tuple[str, ...]) -> None:
-        self.calls.append(f"revoke:{member}")
+    def revoke_project_roles(self, project: str, member: str, roles: tuple[str, ...], condition=None) -> None:
+        self.calls.append(f"revoke:{member}" + (f":if:{condition['title']}" if condition else ""))
+        self.revoked_roles = getattr(self, "revoked_roles", ()) + tuple(roles)
 
     def has_private_service_access(self, project: str, network: str) -> bool:
         self.calls.append(f"psa?:{network}")
@@ -78,6 +85,9 @@ class FakeBootstrap:
 
     def delete_bucket(self, bucket: str) -> None:
         self.calls.append(f"delete-bucket:{bucket}")
+
+    def bucket_has_objects(self, bucket: str) -> bool:
+        return getattr(self, "work_bucket_full", False)
 
 
 class FakeDeployer:
@@ -128,8 +138,12 @@ class TestInitInfra:
             "apis",
             "sa:duckless-infra",
             f"grant:serviceAccount:{SA}",
+            f"grant:serviceAccount:{SA}:if:duckless-runner-roles-only",
             "bucket:acme-data-duckless-infra",
             "upload:module/0.1.0",
+            # the infra account keeps no role once init is over
+            f"revoke:serviceAccount:{SA}",
+            f"revoke:serviceAccount:{SA}:if:duckless-runner-roles-only",
         ]
         deployment_id, source, inputs, service_account = deployer.applied[0]
         assert (deployment_id, source, service_account) == (
@@ -176,7 +190,10 @@ class TestInitInfra:
         assert deployer.destroyed == ["duckless"]
         assert bootstrap.calls == [
             "delete-cloud-run-jobs:duckless-runner@acme-data.iam.gserviceaccount.com",
+            f"grant:serviceAccount:{SA}",
+            f"grant:serviceAccount:{SA}:if:duckless-runner-roles-only",
             f"revoke:serviceAccount:{SA}",
+            f"revoke:serviceAccount:{SA}:if:duckless-runner-roles-only",
             f"delete-sa:{SA}",
             "delete-bucket:acme-data-duckless-infra",
         ]
@@ -189,9 +206,15 @@ class TestInitInfra:
         # when
         status = service.destroy_infra(REQUEST, bootstrap=bootstrap, deployer=deployer, on_step=lambda step: None)
 
-        # then: past runs are gone, the infra SA stays for a retry
+        # then: past runs are gone, the infra SA stays for a retry, without its roles
         assert not status.ok
-        assert bootstrap.calls == ["delete-cloud-run-jobs:duckless-runner@acme-data.iam.gserviceaccount.com"]
+        assert bootstrap.calls == [
+            "delete-cloud-run-jobs:duckless-runner@acme-data.iam.gserviceaccount.com",
+            f"grant:serviceAccount:{SA}",
+            f"grant:serviceAccount:{SA}:if:duckless-runner-roles-only",
+            f"revoke:serviceAccount:{SA}",
+            f"revoke:serviceAccount:{SA}:if:duckless-runner-roles-only",
+        ]
 
 
 class TestInfraRequest:
@@ -369,3 +392,92 @@ class FakeResponse:
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
             raise RuntimeError(self.status_code)
+
+
+class TestLeastPrivilege:
+    def test_given_init_when_granting_then_iam_admin_is_conditional_and_never_plain(self) -> None:
+        # given
+        bootstrap = FakeBootstrap()
+
+        # when
+        init(bootstrap, FakeDeployer(), [])
+
+        # then
+        assert IAM_ADMIN_ROLE not in bootstrap.granted_roles
+        roles, condition = bootstrap.conditional_grants
+        assert roles == (IAM_ADMIN_ROLE,) and condition == RUNNER_GRANTS_ONLY
+
+    def test_given_apply_failure_when_init_then_roles_are_revoked_anyway(self) -> None:
+        # given
+        class FailingDeployer(FakeDeployer):
+            def apply(self, *args, **kwargs):
+                raise RuntimeError("apply failed")
+
+        bootstrap = FakeBootstrap()
+
+        # when
+        with pytest.raises(RuntimeError):
+            init(bootstrap, FailingDeployer(), [])
+
+        # then
+        assert bootstrap.calls[-2:] == [
+            f"revoke:serviceAccount:{SA}",
+            f"revoke:serviceAccount:{SA}:if:duckless-runner-roles-only",
+        ]
+
+    def test_given_older_install_when_revoking_then_plain_iam_admin_is_removed_too(self) -> None:
+        # given: DuckLess 0.4.0 granted project IAM admin without a condition
+        bootstrap = FakeBootstrap()
+
+        # when
+        init(bootstrap, FakeDeployer(), [])
+
+        # then
+        assert IAM_ADMIN_ROLE in bootstrap.revoked_roles
+
+    def test_given_condition_when_reading_it_then_only_runner_roles_are_grantable(self) -> None:
+        # when / then
+        expression = RUNNER_GRANTS_ONLY["expression"]
+        assert expression.startswith("api.getAttribute('iam.googleapis.com/modifiedGrantsByRole', []).hasOnly([")
+        assert all(f"'{role}'" in expression for role in RUNNER_PROJECT_ROLES)
+        assert "roles/owner" not in expression
+
+
+class TestConditionalBindings:
+    def test_given_conditional_grant_when_adding_then_separate_binding_and_policy_version_3(self) -> None:
+        # given: the member already has the role without condition
+        policy = {"version": 1, "bindings": [{"role": "roles/x", "members": ["user:a"]}]}
+
+        # when
+        updated, changed = with_bindings(policy, "user:a", ("roles/x",), RUNNER_GRANTS_ONLY)
+
+        # then
+        assert changed and updated["version"] == 3
+        assert {"role": "roles/x", "members": ["user:a"], "condition": RUNNER_GRANTS_ONLY} in updated["bindings"]
+        assert {"role": "roles/x", "members": ["user:a"]} in updated["bindings"]
+
+    def test_given_conditional_binding_when_revoking_without_condition_then_left_alone(self) -> None:
+        # given
+        policy = {
+            "version": 3,
+            "bindings": [{"role": "roles/x", "members": ["user:a"], "condition": RUNNER_GRANTS_ONLY}],
+        }
+
+        # when
+        _, changed = without_bindings(policy, "user:a", ("roles/x",))
+
+        # then
+        assert not changed
+
+    def test_given_conditional_binding_when_revoking_it_then_binding_removed(self) -> None:
+        # given
+        policy = {
+            "version": 3,
+            "bindings": [{"role": "roles/x", "members": ["user:a"], "condition": RUNNER_GRANTS_ONLY}],
+        }
+
+        # when
+        updated, changed = without_bindings(policy, "user:a", ("roles/x",), RUNNER_GRANTS_ONLY)
+
+        # then
+        assert changed and updated["bindings"] == []

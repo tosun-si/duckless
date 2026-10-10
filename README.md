@@ -49,9 +49,21 @@ duckless result <job-id>
 duckless destroy --project my-project       # removes what init created
 ```
 
-`init` applies the Terraform module shipped with the CLI (`duckless/terraform`) through
-Infrastructure Manager: no local Terraform, state kept in your project, re-run it to upgrade.
-Teams managing infra as code can use the same module directly instead.
+**`duckless init` is optional.** It applies the Terraform module shipped with each release
+([`duckless/terraform`](duckless/terraform/)) through Infrastructure Manager: handy to start in five
+minutes. Teams that keep their infrastructure as code call the same module from their own Terraform
+and CI/CD instead, with their deployment identity, and never run `init`:
+
+```hcl
+module "duckless" {
+  source           = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.4.1"
+  project_id       = "my-project"
+  region           = "europe-west1"
+  runner_image_tag = "0.4.1"
+}
+```
+
+The CLI only reads the settings the module outputs (`envrc`), however they were created.
 
 Full guide: [tosun-si.github.io/duckless](https://tosun-si.github.io/duckless/), from the
 [quickstart](https://tosun-si.github.io/duckless/start/quickstart/) to the
@@ -117,7 +129,7 @@ Hexagonal, kept light: a pure core, ports, adapters, and one wiring point.
 | `duckless/cli.py` | `duckless` command, a driving adapter |
 | `runtime/` | Runner image (`duckless_runtime`), published as `ghcr.io/tosun-si/duckless-runner`: DuckDB with the `gcs`, `bigquery`, `ducklake`, `excel`, `avro` and `iceberg` extensions, the Cloud SQL Auth Proxy, tuned for the machine |
 | `examples/` | Runnable pipelines, with the unit tests of their logic |
-| `duckless/terraform/` | APIs, work bucket, least-privilege runner service account, Artifact Registry remote repository proxying the runner image, optional DuckLake catalog |
+| `duckless/terraform/` | The Terraform module (callable from your own Terraform): APIs, work bucket, least-privilege runner service account, Artifact Registry remote repository proxying the runner image, optional DuckLake catalog and BigQuery access |
 | `duckless/plugin/` | Claude Code plugin: the Agent Skills (`duckless/plugin/skills/`), listed by `.claude-plugin/marketplace.json` |
 | `spike/` | The spike that validated the approach, kept as a record |
 

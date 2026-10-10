@@ -11,7 +11,15 @@ from typing import Annotated, Any
 import typer
 
 from duckless.core.errors import DucklessError
-from duckless.core.infra import InfraRequest, InfraStatus, default_runner_tag, envrc_lines
+from duckless.core.infra import (
+    InfraRequest,
+    InfraStatus,
+    default_runner_tag,
+    destroy_blockers,
+    destroy_summary,
+    envrc_lines,
+    needs_typed_name,
+)
 from duckless.core.job import JobReport, JobRequest, JobState, LogLine
 from duckless.core.preflight import PreflightReport
 from duckless.core.routing import ExecutorKind, Placement
@@ -302,15 +310,35 @@ def init(
 def destroy(
     ctx: typer.Context,
     name: Annotated[str, typer.Option(help="Prefix given to init")] = "duckless",
-    force: Annotated[bool, typer.Option("--force", help="Also delete a non-empty work bucket")] = False,
-    yes: Annotated[bool, typer.Option("--yes", help="Do not ask for confirmation")] = False,
+    force: Annotated[
+        bool, typer.Option("--force", help="Also delete a non-empty work bucket and a DuckLake catalog")
+    ] = False,
+    yes: Annotated[bool, typer.Option("--yes", help="Do not ask for confirmation (not enough with a catalog)")] = False,
+    confirm_name: Annotated[
+        str | None,
+        typer.Option("--confirm-name", help="The installation name, to delete a DuckLake catalog without a prompt"),
+    ] = None,
     project: Project = None,
     region: Region = None,
 ) -> None:
-    """Delete everything `duckless init` created in the project."""
+    """Delete everything `duckless init` created in the project (never your data buckets or datasets)."""
     request = _scoped(ctx, project, region).infra_request(name=name, force_destroy=force)
-    if not yes:
-        typer.confirm(f"Delete the DuckLess deployment '{name}' in {request.project}?", abort=True)
+    plan = _infra().plan_destroy(request)
+    blockers = destroy_blockers(plan, force)
+    if blockers:
+        for reason in blockers:
+            typer.echo(f"refused: {reason}", err=True)
+        if plan.deployment_exists:
+            typer.echo("nothing was deleted; add --force to delete them too", err=True)
+        raise typer.Exit(1)
+    _echo(destroy_summary(plan))
+    if needs_typed_name(plan):
+        typed = confirm_name or typer.prompt(f"Type the installation name ({name}) to delete it and its lake")
+        if typed != name:
+            typer.echo("names differ: nothing was deleted", err=True)
+            raise typer.Exit(1)
+    elif not yes:
+        typer.confirm(f"Delete the DuckLess installation '{name}' in {request.project}?", abort=True)
     if force:
         typer.echo("  - re-applying with force_destroy so the work bucket can be deleted")
         _infra().init(request, lambda step: typer.echo(f"    {step}"))

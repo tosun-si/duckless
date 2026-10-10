@@ -31,11 +31,21 @@ resource "google_project_iam_member" "runner_bigquery" {
   depends_on = [google_project_service.bigquery]
 }
 
-resource "google_bigquery_dataset_iam_member" "runner_read" {
-  for_each = toset(var.bigquery_datasets)
+locals {
+  # `dataset` or `project.dataset` (`project:dataset` accepted) -> {project, dataset}
+  bigquery_dataset_refs = {
+    for d in var.bigquery_datasets : d => {
+      project = length(split(".", replace(d, ":", "."))) == 2 ? split(".", replace(d, ":", "."))[0] : var.project_id
+      dataset = reverse(split(".", replace(d, ":", ".")))[0]
+    }
+  }
+}
 
-  project    = var.project_id
-  dataset_id = each.value
+resource "google_bigquery_dataset_iam_member" "runner_read" {
+  for_each = local.bigquery_dataset_refs
+
+  project    = each.value.project
+  dataset_id = each.value.dataset
   role       = "roles/bigquery.dataViewer"
   member     = google_service_account.runner.member
 

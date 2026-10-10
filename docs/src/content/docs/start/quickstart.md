@@ -27,6 +27,12 @@ duckless --help
 duckless init --project my-project --region europe-west1
 ```
 
+:::note[init is a shortcut, not a requirement]
+`init` applies the DuckLess Terraform module for you. Teams that keep their infrastructure as code
+call the same module from their own Terraform and CI/CD instead, and skip `init` entirely: see
+[Infrastructure](/duckless/guides/infrastructure/#your-terraform).
+:::
+
 `init` enables the APIs it needs, then lets Infrastructure Manager create a work bucket, a
 service account for the job VMs and a proxy for the runner image (details in
 [Infrastructure](/duckless/guides/infrastructure/)). It takes a few minutes and ends with

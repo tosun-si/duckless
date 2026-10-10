@@ -70,7 +70,13 @@ variable "ducklake" {
 }
 
 variable "network" {
-  description = "VPC network of the job VMs and of the catalog's private IP."
+  description = "VPC network of the jobs and of the catalog's private IP: a name in this project, or a full path (projects/<host>/global/networks/<name>) for a Shared VPC."
+  type        = string
+  default     = "default"
+}
+
+variable "subnetwork" {
+  description = "Subnetwork of the jobs in the region: a name in this project, or a full path (projects/<host>/regions/<region>/subnetworks/<name>) for a Shared VPC."
   type        = string
   default     = "default"
 }
@@ -82,7 +88,7 @@ variable "catalog_tier" {
 }
 
 variable "bigquery_datasets" {
-  description = "BigQuery datasets of this project the jobs may read (dataset ids): the runner gets roles/bigquery.dataViewer on each, and the Storage Read API on the project."
+  description = "BigQuery datasets the jobs may read: `dataset` (this project) or `project.dataset`. The runner gets roles/bigquery.dataViewer on each, and the Storage Read API on this project. Datasets of other projects need the applying identity to manage their IAM."
   type        = list(string)
   default     = []
 }
@@ -91,4 +97,16 @@ variable "bigquery_jobs" {
   description = "Let jobs run BigQuery queries (the extension's ATTACH, bigquery_query): roles/bigquery.jobUser on the project."
   type        = bool
   default     = false
+}
+
+variable "catalog_final_backup_days" {
+  description = "Days a final backup of the DuckLake catalog is kept after the instance is deleted (1 to 365)."
+  type        = number
+  default     = 30
+}
+
+variable "job_submitters" {
+  description = "Members who run DuckLess jobs (`group:…`, `user:…`, `serviceAccount:…` of a CI): create Batch and Cloud Run jobs, act as the runner account, use the work bucket, read logs and quotas."
+  type        = list(string)
+  default     = []
 }
