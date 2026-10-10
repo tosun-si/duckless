@@ -1,6 +1,6 @@
 [project]
 name = "duckless"
-version = "0.4.0"
+version = "0.4.1"
 description = "Serverless DuckDB on GCP: run SQL or your own code on a right-sized VM in your project, then tear it down"
 readme = "README.md"
 license = "Apache-2.0"

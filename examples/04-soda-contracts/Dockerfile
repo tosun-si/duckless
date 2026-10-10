@@ -2,7 +2,7 @@
 # runner account can read, and run it with `duckless exec`.
 FROM ghcr.io/astral-sh/uv:0.8 AS uv
 
-FROM ghcr.io/tosun-si/duckless-runner:0.4.0
+FROM ghcr.io/tosun-si/duckless-runner:0.4.1
 USER root
 COPY --from=uv /uv /usr/local/bin/uv
 # Same DuckDB as the runner: soda-duckdb accepts it, and the baked extensions stay compatible.

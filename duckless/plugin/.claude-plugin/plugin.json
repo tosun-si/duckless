@@ -1,7 +1,7 @@
 {
   "name": "duckless",
   "displayName": "DuckLess",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Agent Skills for DuckLess, serverless DuckDB on GCP: setup, writing jobs, sizing, troubleshooting, DuckLake.",
   "author": {
     "name": "Mazlum Tosun"
