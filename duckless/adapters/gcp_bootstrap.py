@@ -187,6 +187,16 @@ class GcpInfraBootstrap:
             operation.result()
         return len(jobs)
 
+    def service_account_exists(self, project: str, email: str) -> bool:
+        response = self._request("GET", f"{IAM}/projects/{project}/serviceAccounts/{email}")
+        if response.status_code == 404:
+            return False
+        response.raise_for_status()
+        return True
+
+    def bucket_exists(self, bucket: str) -> bool:
+        return self._storage.lookup_bucket(bucket) is not None
+
     def bucket_has_objects(self, bucket: str) -> bool:
         if self._storage.lookup_bucket(bucket) is None:
             return False

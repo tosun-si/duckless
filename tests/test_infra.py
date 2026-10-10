@@ -86,6 +86,12 @@ class FakeBootstrap:
     def delete_bucket(self, bucket: str) -> None:
         self.calls.append(f"delete-bucket:{bucket}")
 
+    def service_account_exists(self, project: str, email: str) -> bool:
+        return getattr(self, "infra_account_left", False)
+
+    def bucket_exists(self, bucket: str) -> bool:
+        return getattr(self, "staging_left", False)
+
     def bucket_has_objects(self, bucket: str) -> bool:
         return getattr(self, "work_bucket_full", False)
 
@@ -181,7 +187,7 @@ class TestInitInfra:
 
     def test_given_deployment_when_destroying_then_deletes_it_then_infra_sa_and_staging(self) -> None:
         # given
-        bootstrap, deployer = FakeBootstrap(), FakeDeployer()
+        bootstrap, deployer = FakeBootstrap(), FakeDeployer(current=InfraStatus("duckless", "ACTIVE"))
 
         # when
         status = service.destroy_infra(REQUEST, bootstrap=bootstrap, deployer=deployer, on_step=lambda step: None)
@@ -201,7 +207,8 @@ class TestInitInfra:
 
     def test_given_deletion_failure_when_destroying_then_keeps_infra_sa_for_a_retry(self) -> None:
         # given
-        bootstrap, deployer = FakeBootstrap(), FakeDeployer(destroy_error="bucket not empty")
+        bootstrap = FakeBootstrap()
+        deployer = FakeDeployer(destroy_error="bucket not empty", current=InfraStatus("duckless", "ACTIVE"))
 
         # when
         status = service.destroy_infra(REQUEST, bootstrap=bootstrap, deployer=deployer, on_step=lambda step: None)

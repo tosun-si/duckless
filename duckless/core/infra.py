@@ -251,9 +251,13 @@ class DestroyPlan:
     work_bucket: str | None = None
     work_bucket_has_objects: bool = False
     catalog_instance: str | None = None
+    # What `init` creates outside Terraform, left behind when a destroy stopped after the deployment.
+    leftovers: bool = False
 
 
-def destroy_plan(name: str, current: InfraStatus | None, work_bucket_has_objects: bool) -> DestroyPlan:
+def destroy_plan(
+    name: str, current: InfraStatus | None, work_bucket_has_objects: bool, leftovers: bool = False
+) -> DestroyPlan:
     outputs = current.outputs if current else {}
     return DestroyPlan(
         name=name,
@@ -261,12 +265,13 @@ def destroy_plan(name: str, current: InfraStatus | None, work_bucket_has_objects
         work_bucket=outputs.get("work_bucket") or None,
         work_bucket_has_objects=work_bucket_has_objects,
         catalog_instance=outputs.get("ducklake_instance") or None,
+        leftovers=leftovers,
     )
 
 
 def destroy_blockers(plan: DestroyPlan, force: bool) -> tuple[str, ...]:
     """Why destroy refuses to start; empty when it may go on."""
-    if not plan.deployment_exists:
+    if not plan.deployment_exists and not plan.leftovers:
         return (f"no DuckLess installation '{plan.name}' here (check --name, --project, --region)",)
     if force:
         return ()
@@ -283,6 +288,11 @@ def destroy_blockers(plan: DestroyPlan, force: bool) -> tuple[str, ...]:
 
 
 def destroy_summary(plan: DestroyPlan) -> list[str]:
+    if not plan.deployment_exists:
+        return [
+            f"duckless destroy '{plan.name}': the deployment is already gone; it finishes an interrupted destroy:",
+            "  - the Infrastructure Manager account (and any role it still holds) and its staging bucket",
+        ]
     lines = [f"duckless destroy '{plan.name}' deletes:"]
     if plan.work_bucket:
         objects = " and everything in it" if plan.work_bucket_has_objects else " (empty)"

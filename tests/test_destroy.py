@@ -4,7 +4,14 @@ import pytest
 from typer.testing import CliRunner
 
 from duckless import cli
-from duckless.core.infra import DestroyPlan, InfraStatus, destroy_blockers, destroy_plan, needs_typed_name
+from duckless.core.infra import (
+    DestroyPlan,
+    InfraStatus,
+    destroy_blockers,
+    destroy_plan,
+    destroy_summary,
+    needs_typed_name,
+)
 from duckless.wiring import InfraServices
 
 LAKE = InfraStatus(
@@ -98,3 +105,54 @@ class TestDestroyCommand:
 
         # then
         assert calls.destroyed == ["duckless"]
+
+
+class TestInterruptedDestroy:
+    def test_given_no_deployment_but_leftovers_when_planning_then_allowed_and_explained(self) -> None:
+        # given
+        plan = destroy_plan("duckless", None, False, leftovers=True)
+
+        # when / then
+        assert destroy_blockers(plan, force=False) == ()
+        assert "already gone" in destroy_summary(plan)[0]
+
+    def test_given_no_deployment_and_no_leftovers_when_planning_then_refused(self) -> None:
+        # when / then
+        assert destroy_blockers(destroy_plan("duckless", None, False, leftovers=False), force=True)
+
+    def test_given_deployment_gone_when_destroying_then_infra_account_and_staging_removed(self) -> None:
+        # given: the deployment was deleted, the infra account was left with its roles
+        from duckless import service
+        from tests.test_infra import REQUEST, SA, FakeBootstrap, FakeDeployer
+
+        bootstrap, deployer = FakeBootstrap(), FakeDeployer(current=None)
+
+        # when
+        status = service.destroy_infra(REQUEST, bootstrap=bootstrap, deployer=deployer, on_step=lambda s: None)
+
+        # then: no deployment deletion, no re-grant, but revoke and delete
+        assert status.state == "DELETED" and deployer.destroyed == []
+        assert not any(call.startswith("grant") for call in bootstrap.calls)
+        assert f"delete-sa:{SA}" in bootstrap.calls and "delete-bucket:acme-data-duckless-infra" in bootstrap.calls
+        assert f"revoke:serviceAccount:{SA}" in bootstrap.calls
+
+    def test_given_leftovers_and_force_when_destroying_then_no_reinit(self, monkeypatch) -> None:
+        # given
+        inits: list[str] = []
+        destroyed: list[str] = []
+        plan = destroy_plan("duckless", None, False, leftovers=True)
+        monkeypatch.setattr(
+            cli,
+            "_infra",
+            lambda: InfraServices(
+                init=lambda r, s: inits.append(r.name) or InfraStatus("d", "ACTIVE"),
+                destroy=lambda r, s: destroyed.append(r.name) or InfraStatus("d", "DELETED"),
+                plan_destroy=lambda r: plan,
+            ),
+        )
+
+        # when
+        CliRunner().invoke(cli.app, ["destroy", "--project", "acme", "--force", "--yes"])
+
+        # then: finishing a destroy must not re-create the installation
+        assert inits == [] and destroyed == ["duckless"]
