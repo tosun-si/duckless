@@ -17,11 +17,15 @@ import duckdb
 
 from duckless_runtime.bigquery import read_bigquery  # noqa: F401 (public API)
 from duckless_runtime.lake import attach_sql, lake_settings, start_proxy
+from duckless_runtime.staging import stage_locally  # noqa: F401 (public API)
 
 SCRATCH_DIR = Path(os.environ.get("DUCKLESS_SCRATCH_DIR", "/mnt/disks/scratch"))
 MEMORY_FRACTION = float(os.environ.get("DUCKLESS_MEMORY_FRACTION", "0.8"))
 # gRPC measured faster than HTTP on every read/write case of the spike.
 GCS_GRPC = os.environ.get("DUCKLESS_GCS_GRPC", "true").lower() == "true"
+# Ranges of one object fetched at once: DuckDB's default (5) caps one big file around 100 MB/s;
+# 32 read a 12 GB CSV 4 to 6 times faster (355 MB/s gRPC, 563 MB/s HTTP, n2-highmem-32).
+GCS_TRANSFER_CONCURRENCY = int(os.environ.get("DUCKLESS_GCS_TRANSFER_CONCURRENCY", "32"))
 CGROUP_CPU_MAX = Path("/sys/fs/cgroup/cpu.max")
 # The gcs extension's gRPC transport opens many sockets; container defaults (often 1024) run out.
 OPEN_FILES_TARGET = 65536
@@ -84,6 +88,7 @@ def session_sql(settings: RuntimeSettings) -> tuple[str, ...]:
         "LOAD gcs",
         # Must be set before the first GCS call: the client is built once per process.
         f"SET gcs_enable_grpc = {str(settings.gcs_grpc).lower()}",
+        f"SET gcs_transfer_concurrency = {GCS_TRANSFER_CONCURRENCY}",
         f"CREATE OR REPLACE SECRET duckless_gcp (TYPE GCP, PROVIDER credential_chain{project})",
         f"SET memory_limit = '{settings.memory_limit_gb}GB'",
         f"SET threads = {settings.threads}",
