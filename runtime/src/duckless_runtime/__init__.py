@@ -128,8 +128,12 @@ def connect(database: str = ":memory:") -> duckdb.DuckDBPyConnection:
     for statement in session_sql(settings):
         con.sql(statement)
 
-    # BigQuery reads (bigquery_scan, read_bigquery) without a LOAD in every job: 0.1 s.
-    con.sql("LOAD bigquery")
+    # BigQuery reads (bigquery_scan, read_bigquery) without a LOAD in every job: 0.1 s. The runner
+    # image ships the extension; a laptop running a job locally may not, and must not fail for it.
+    try:
+        con.sql("LOAD bigquery")
+    except duckdb.IOException:
+        log("bigquery_extension_unavailable", severity="WARNING")
 
     lake = lake_settings(os.environ)
     if lake is not None:
