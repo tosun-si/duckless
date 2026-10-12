@@ -9,7 +9,7 @@ A job transforms with DuckDB, then writes the result to BigQuery with one call:
 from duckless_runtime import connect, to_bigquery
 
 con = connect()
-con.sql("CREATE TABLE accepted AS SELECT ...")   # the transformations, in DuckDB
+con.sql("CREATE TABLE accepted AS SELECT ...")  # the transformations, in DuckDB
 
 to_bigquery(con, "SELECT * FROM accepted", "my-project.finance.journal_lines", mode="replace_partitions")
 ```
@@ -43,8 +43,14 @@ Every mode is atomic: the table shows all of the write or none of it, never half
 `append` and `replace` create a missing table; `partition_by` and `cluster_by` set it up:
 
 ```python
-to_bigquery(con, "SELECT * FROM lines", "my-project.finance.journal_lines", mode="append",
-            partition_by="posting_date", cluster_by=["entry_id", "line_no"])
+to_bigquery(
+    con,
+    "SELECT * FROM lines",
+    "my-project.finance.journal_lines",
+    mode="append",
+    partition_by="posting_date",
+    cluster_by=["entry_id", "line_no"],
+)
 ```
 
 ## Choosing a mode: replace partitions when you can
@@ -79,8 +85,13 @@ a batch is complete for its partitions: when in doubt, `merge`.
 ### Making merge cheap
 
 ```python
-to_bigquery(con, "SELECT * FROM corrections", "my-project.finance.journal_lines", mode="merge",
-            key=["posting_date", "entry_id", "line_no"])
+to_bigquery(
+    con,
+    "SELECT * FROM corrections",
+    "my-project.finance.journal_lines",
+    mode="merge",
+    key=["posting_date", "entry_id", "line_no"],
+)
 ```
 
 - **The partition column in `key`**: the `MERGE` reads only the partitions the data touches.
