@@ -38,6 +38,7 @@ export default defineConfig({
 						{ label: 'Machines, Spot and spill', slug: 'guides/machines' },
 						{ label: 'DuckLake tables', slug: 'guides/ducklake' },
 						{ label: 'Reading BigQuery', slug: 'guides/bigquery' },
+						{ label: 'Writing to BigQuery', slug: 'guides/bigquery-writes' },
 						{ label: 'Agent Skills', slug: 'guides/agent-skills' },
 						{ label: 'Infrastructure', slug: 'guides/infrastructure' },
 					],

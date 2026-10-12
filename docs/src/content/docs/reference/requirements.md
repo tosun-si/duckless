@@ -127,7 +127,7 @@ the jobs when the catalog is set; the subnetwork must allow it.
 | `DUCKLESS_DUCKLAKE_INSTANCE` | instance connection name, `project:region:instance` |
 | `DUCKLESS_DUCKLAKE_DATA_PATH` | `gcss://<work or data bucket>/lake/` (**`gcss://`, not `gs://`**) |
 
-## 3. BigQuery: reading tables
+## 3. BigQuery: reading and writing tables
 
 Only to read BigQuery tables (`bigquery_scan`, `read_bigquery`).
 
@@ -137,6 +137,16 @@ Only to read BigQuery tables (`bigquery_scan`, `read_bigquery`).
 | `roles/bigquery.readSessionUser` | the jobs' project | Storage Read API sessions (billed there) |
 | `roles/bigquery.dataViewer` | each dataset read (any project) | read the tables |
 | `roles/bigquery.jobUser` | the jobs' project, optional | only for queries: `bigquery_query`, `ATTACH … (TYPE bigquery)` |
+
+### Writing tables, in addition
+
+Only to write BigQuery tables (`to_bigquery`). The module grants these for `bigquery_write_datasets`.
+
+| | On | Why |
+| --- | --- | --- |
+| API `bigquery.googleapis.com` | project | |
+| `roles/bigquery.jobUser` | the jobs' project | the load jobs and the SQL after them (billed there) |
+| `roles/bigquery.dataEditor` | each dataset written (any project) | write the table; the staging tables of `replace_partitions` and `merge` live there too |
 
 ## 4. Job submitters
 

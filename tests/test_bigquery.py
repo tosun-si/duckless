@@ -83,3 +83,34 @@ class TestInputsAndRoles:
         # then
         assert set(BIGQUERY_INFRA_SA_ROLES).isdisjoint(bootstrap.granted_roles)
         assert set(BIGQUERY_INFRA_SA_ROLES) <= set(infra_sa_roles(ducklake=False, bigquery=True))
+
+
+class TestWriteDatasets:
+    def test_given_write_datasets_when_building_inputs_then_dataset_ids(self) -> None:
+        # when
+        inputs = deployment_inputs(replace(REQUEST, bigquery_write_datasets=("acme-data.finance",)))
+
+        # then
+        assert inputs["bigquery_write_datasets"] == ["finance"]
+
+    def test_given_foreign_write_dataset_when_building_then_refused_naming_the_write_role(self) -> None:
+        # when / then
+        with pytest.raises(InvalidInfraRequestError, match=r"roles/bigquery\.dataEditor"):
+            replace(REQUEST, bigquery_write_datasets=("other:finance",))
+
+    def test_given_deployment_with_write_datasets_when_init_without_options_then_kept(self) -> None:
+        # given
+        current = InfraStatus("duckless", "ACTIVE", {"bigquery_write_datasets": ["finance"]})
+
+        # when / then
+        assert resolved_request(REQUEST, current).bigquery_write_datasets == ("finance",)
+
+    def test_given_only_write_datasets_when_init_then_infra_account_may_grant_on_them(self) -> None:
+        # given
+        bootstrap = FakeBootstrap()
+
+        # when
+        init(bootstrap, FakeDeployer(), [], replace(REQUEST, bigquery_write_datasets=("finance",)))
+
+        # then
+        assert set(BIGQUERY_INFRA_SA_ROLES) <= set(bootstrap.granted_roles)

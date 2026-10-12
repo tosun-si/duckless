@@ -99,6 +99,12 @@ variable "bigquery_jobs" {
   default     = false
 }
 
+variable "bigquery_write_datasets" {
+  description = "BigQuery datasets the jobs may write (duckless_runtime.to_bigquery): `dataset` (this project) or `project.dataset`. The runner gets roles/bigquery.dataEditor on each (its staging tables live there too), and roles/bigquery.jobUser on this project for the load jobs and the SQL after them."
+  type        = list(string)
+  default     = []
+}
+
 variable "catalog_final_backup_days" {
   description = "Days a final backup of the DuckLake catalog is kept after the instance is deleted (1 to 365)."
   type        = number

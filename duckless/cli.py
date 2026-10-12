@@ -287,6 +287,13 @@ def init(
             help="Let jobs run BigQuery queries (ATTACH, bigquery_query); default: the deployment's",
         ),
     ] = None,
+    bigquery_write_dataset: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--bigquery-write-dataset",
+            help="BigQuery dataset of this project jobs may write (to_bigquery), repeatable; default: the deployment's",
+        ),
+    ] = None,
     project: Project = None,
     region: Region = None,
 ) -> None:
@@ -299,6 +306,7 @@ def init(
         network=network,
         bigquery_datasets=tuple(bigquery_dataset) if bigquery_dataset else None,
         bigquery_jobs=bigquery_jobs,
+        bigquery_write_datasets=tuple(bigquery_write_dataset) if bigquery_write_dataset else None,
     )
     typer.echo(f"duckless init: {request.project} ({request.region})")
     status = _infra().init(request, lambda step: typer.echo(f"  - {step}"))

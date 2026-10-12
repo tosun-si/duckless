@@ -16,6 +16,7 @@ from pathlib import Path
 import duckdb
 
 from duckless_runtime.bigquery import read_bigquery  # noqa: F401 (public API)
+from duckless_runtime.bigquery_write import to_bigquery  # noqa: F401 (public API)
 from duckless_runtime.lake import attach_sql, lake_settings, start_proxy
 from duckless_runtime.staging import stage_locally  # noqa: F401 (public API)
 

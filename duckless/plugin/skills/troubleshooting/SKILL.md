@@ -34,6 +34,9 @@ one `statement_done` per statement, then `job_done` or `job_failed` with the err
 | Slow read of one big CSV/JSON (~100 MB/s) | one file fetched by few streams | `stage_locally('gs://…')` then read locally; or split the file upstream |
 | Slow writes to GCS | single Parquet writer | `PER_THREAD_OUTPUT, FILE_SIZE_BYTES '256MB'` |
 | BigQuery `Permission Denied` | dataset not granted, or a query (`ATTACH`, `bigquery_query`) without `--bigquery-jobs` | `duckless init --bigquery-dataset <dataset>` (`--bigquery-jobs` for queries); datasets of other projects: their owners grant `roles/bigquery.dataViewer` |
+| `to_bigquery` `Permission Denied` / `Access Denied` | the dataset is not a write dataset | `duckless init --bigquery-write-dataset <dataset>`; other projects: their owners grant `roles/bigquery.dataEditor` |
+| `to_bigquery` refused before writing | a guard: duplicate or NULL keys, NULL partition values, columns the table lacks, an ingestion-time table for `replace_partitions` | the message names the rows or columns: fix the data, or the mode |
+| `Query exceeded limit for bytes billed` | `max_bytes_billed` reached; the table is unchanged | an unpruned `merge`: partition column in `key` or `prune=True`; or raise the cap |
 | Slow BigQuery read | large table on Cloud Run | `--on batch`, select fewer columns, add a `filter` |
 | Slow Python | row-by-row UDF | vectorized (Arrow) UDF or SQL |
 

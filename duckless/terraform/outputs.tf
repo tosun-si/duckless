@@ -59,3 +59,8 @@ output "bigquery_jobs" {
   description = "Whether jobs may run BigQuery queries (kept by the next `duckless init`)."
   value       = var.bigquery_jobs
 }
+
+output "bigquery_write_datasets" {
+  description = "BigQuery datasets the jobs may write (kept by the next `duckless init`)."
+  value       = var.bigquery_write_datasets
+}
