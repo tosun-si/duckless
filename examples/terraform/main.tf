@@ -29,11 +29,11 @@ variable "region" {
 }
 
 module "duckless" {
-  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.4.1"
+  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.4.2"
 
   project_id       = var.project_id
   region           = var.region
-  runner_image_tag = "0.4.1" # the CLI version your jobs use
+  runner_image_tag = "0.4.2" # the CLI version your jobs use
 
   # Buckets the jobs read and write (in any project).
   data_buckets = ["${var.project_id}-raw", "central-lake-bucket"]

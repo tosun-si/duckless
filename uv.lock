@@ -286,7 +286,7 @@ wheels = [
 
 [[package]]
 name = "duckless"
-version = "0.4.1"
+version = "0.4.2"
 source = { editable = "." }
 dependencies = [
     { name = "google-cloud-batch" },

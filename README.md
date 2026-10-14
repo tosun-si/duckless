@@ -57,10 +57,10 @@ and CI/CD instead, with their deployment identity, and never run `init`:
 
 ```hcl
 module "duckless" {
-  source           = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.4.1"
+  source           = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.4.2"
   project_id       = "my-project"
   region           = "europe-west1"
-  runner_image_tag = "0.4.1"
+  runner_image_tag = "0.4.2"
 }
 ```
 
