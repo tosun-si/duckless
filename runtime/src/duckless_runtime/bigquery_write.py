@@ -9,8 +9,8 @@ itself recommends loading in bulk. The four modes differ in what happens after t
   metadata only, so BigQuery bills the staging rows read by the INSERT, never the target.
 - merge: the load fills a staging table; one MERGE on the key. When the partition column is part
   of the key (or `prune=True` says a row never changes partition), the MERGE reads only the
-  partitions the data touches, computed into script variables first: BigQuery does not prune on a
-  subquery.
+  partitions the data touches, computed into a script variable first: BigQuery refuses a subquery
+  in a MERGE's ON clause.
 
 The staging table lives in the target's dataset, takes the target's column types (a type
 mismatch fails before the target is touched), expires after a day and is dropped at the end.

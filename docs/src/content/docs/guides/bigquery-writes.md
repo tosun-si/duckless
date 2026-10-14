@@ -95,8 +95,9 @@ to_bigquery(
 ```
 
 - **The partition column in `key`**: the `MERGE` reads only the partitions the data touches.
-  DuckLess computes them first into a script variable (BigQuery does not prune on a subquery in
-  `ON`, the trap most hand-written merges fall into).
+  DuckLess computes them first into a script variable: BigQuery refuses a subquery in a `MERGE`'s
+  `ON` clause ("IN subquery is not supported inside join predicate"), so hand-written merges
+  often drop the filter and read the whole table.
 - **Not in the key, but a row never changes partition** (an entry keeps its posting date):
   `prune=True` gives the same pruning. Wrong if a row can move: its old version, in another
   partition, would not be found and the row would be inserted twice. That's why it isn't the
