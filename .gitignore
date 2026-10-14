@@ -14,3 +14,7 @@ spike/results/
 docs/node_modules/
 docs/dist/
 docs/.astro/
+
+# IntelliJ / PyCharm project files
+.idea/
+*.iml
