@@ -70,8 +70,5 @@ billed as such; `bigquery_scan` is enough to read tables.
 
 ## Writing back
 
-Write Parquet to GCS, then load it into BigQuery: a load job is free.
-
-```bash
-bq load --source_format=PARQUET --replace sales.orders_scored "gs://my-bucket/out/*.parquet"
-```
+`to_bigquery` writes a result to a BigQuery table: a free load job, then the cheapest way to replace
+partitions or merge. See [Writing to BigQuery](../bigquery-writes/).

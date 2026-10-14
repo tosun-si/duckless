@@ -93,7 +93,7 @@ def _grant_infra_roles(
 ) -> None:
     """The Infrastructure Manager account gets its roles only while it applies or deletes."""
     member = _infra_account(request)
-    roles = infra_sa_roles(bool(request.ducklake), bool(request.bigquery_datasets))
+    roles = infra_sa_roles(bool(request.ducklake), request.bigquery)
     changed = bootstrap.grant_project_roles(request.project, member, roles)
     # Project IAM admin, but only to grant or revoke the runner's roles: never Owner, never anyone else's.
     changed = bootstrap.grant_project_roles(request.project, member, (IAM_ADMIN_ROLE,), RUNNER_GRANTS_ONLY) or changed

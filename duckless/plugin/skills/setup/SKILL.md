@@ -30,7 +30,8 @@ Terraform module outputs. Ask how the team manages infrastructure:
      region           = "europe-west1"
      runner_image_tag = "<version>"
      data_buckets      = [...]          # buckets jobs read and write, any project
-     bigquery_datasets = [...]          # `dataset` or `project.dataset`
+     bigquery_datasets = [...]          # read: `dataset` or `project.dataset`
+     bigquery_write_datasets = [...]    # write (to_bigquery)
      # ducklake = true, network/subnetwork = full paths on a Shared VPC
    }
    output "envrc" { value = module.duckless.envrc }
@@ -53,7 +54,7 @@ resources from the Requirements page (https://tosun-si.github.io/duckless/refere
 layer by layer: DuckLess (APIs, work bucket with the `runs/` lifecycle, runner account and its roles,
 image reachable without external IP, Private Google Access), then DuckLake only if they use it
 (private services access, Cloud SQL with IAM auth, the runner's IAM database user and Cloud SQL
-roles), BigQuery only if they read it, and the job submitters' roles. Map each requirement to their
+roles), BigQuery only if they read or write it, and the job submitters' roles. Map each requirement to their
 module's inputs, keep the `DUCKLESS_*` settings as outputs, and tell them to check the release
 notes for requirement changes on each upgrade.
 
@@ -68,6 +69,7 @@ notes for requirement changes on each upgrade.
    - `--data-bucket <bucket>` (repeatable): existing buckets jobs may read and write.
    - `--ducklake`: also create a DuckLake catalog (see the `ducklake` skill). About 10 more minutes.
    - `--bigquery-dataset <dataset>` (repeatable): datasets of the project jobs may read.
+   - `--bigquery-write-dataset <dataset>` (repeatable): datasets jobs may write (`to_bigquery`).
    - `--network <vpc>`: network of the jobs; `default` otherwise.
 5. Paste the `export …` lines `init` prints into the project's `.envrc` (direnv), then
    `direnv allow`. They are not secrets but are per-project.

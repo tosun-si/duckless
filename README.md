@@ -24,7 +24,8 @@ Serverless DuckDB on GCP. Submit SQL or your own code; DuckLess runs it **in you
 on a right-sized machine (Cloud Batch VM with local SSD for spill, or Cloud Run Jobs for small
 jobs), reads and writes GCS with the job's own credentials (no HMAC keys), then tears it down.
 Nothing runs between jobs. Jobs read Parquet, CSV, JSON, Excel and
-[BigQuery tables](https://tosun-si.github.io/duckless/guides/bigquery/); optional
+[BigQuery tables](https://tosun-si.github.io/duckless/guides/bigquery/), and
+[write BigQuery tables](https://tosun-si.github.io/duckless/guides/bigquery-writes/); optional
 [DuckLake](https://tosun-si.github.io/duckless/guides/ducklake/) tables on a Cloud SQL catalog, and
 [Agent Skills](https://tosun-si.github.io/duckless/guides/agent-skills/) for coding agents.
 
@@ -82,6 +83,11 @@ Full guide: [tosun-si.github.io/duckless](https://tosun-si.github.io/duckless/),
 - **Read BigQuery**: `bigquery_scan('project.dataset.table', filter = '…')` in SQL,
   `read_bigquery(con, table, columns, where)` in Python; only the columns and rows asked for leave
   BigQuery (`duckless init --bigquery-dataset <dataset>` first).
+- **Write BigQuery**: `to_bigquery(con, query, "project.dataset.table", mode=...)`: Parquet, a free
+  load job, then `replace_partitions` (deletes whole partitions for free, bills only the new rows) or
+  a `merge` that reads only the partitions it touches
+  ([guide](https://tosun-si.github.io/duckless/guides/bigquery-writes/);
+  `duckless init --bigquery-write-dataset <dataset>` first).
 
 More in [Writing jobs](https://tosun-si.github.io/duckless/guides/writing-jobs/) and
 [Machines, Spot and spill](https://tosun-si.github.io/duckless/guides/machines/).
