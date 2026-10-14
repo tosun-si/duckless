@@ -1,6 +1,6 @@
 ---
 title: Infrastructure
-description: The resources DuckLess needs, created by your own Terraform or by duckless init, the permissions involved, and how to remove them.
+description: The Google Cloud resources DuckLess needs, from the Terraform module or duckless init, the IAM permissions involved, and how to remove them.
 ---
 
 DuckLess needs a few resources in the project where jobs run: a work bucket, a runner service

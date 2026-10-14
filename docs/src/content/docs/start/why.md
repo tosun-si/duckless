@@ -1,6 +1,6 @@
 ---
-title: Why DuckLess
-description: The gap DuckLess fills between Cloud Run, BigQuery and running DuckDB yourself.
+title: "Why DuckLess: DuckDB on GCP without a server"
+description: Where DuckDB on Google Cloud fits between BigQuery, Cloud Run and a VM you run yourself, and when it is the wrong tool.
 ---
 
 DuckDB is a single-node engine that gets the most out of a big machine: lots of memory,
