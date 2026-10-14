@@ -5,6 +5,22 @@ description = "Serverless DuckDB on GCP: run SQL or your own code on a right-siz
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.13"
+keywords = [
+    "duckdb", "serverless", "google-cloud", "gcp", "bigquery", "cloud-run", "cloud-batch",
+    "ducklake", "data-engineering", "sql", "etl",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: SQL",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: System :: Distributed Computing",
+]
 dependencies = [
     "typer>=0.15",
     "google-cloud-batch>=0.17",
@@ -16,7 +32,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tosun-si/duckless"
+Homepage = "https://tosun-si.github.io/duckless/"
+Documentation = "https://tosun-si.github.io/duckless/"
 Repository = "https://github.com/tosun-si/duckless"
 Changelog = "https://github.com/tosun-si/duckless/releases"
 Issues = "https://github.com/tosun-si/duckless/issues"
