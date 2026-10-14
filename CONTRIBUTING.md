@@ -21,8 +21,13 @@ Python 3.13 and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/tosun-si/duckless.git
 cd duckless
 uv sync
+uvx pre-commit install     # the commit message check (see Pull requests)
 cp .envrc.example .envrc   # direnv: only needed to run real jobs
 ```
+
+If git has a global `core.hooksPath`, `pre-commit install` refuses to run; install into the
+repository's own hooks with
+`GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0= uvx pre-commit install`.
 
 | Check | Command |
 | --- | --- |
@@ -71,6 +76,10 @@ import.
 - Update the docs (`docs/`) and, when the behaviour of a command changes, the Agent Skills
   (`duckless/plugin/skills/`) in the same pull request.
 - Pull requests are squash-merged.
+- **No co-authors in commit messages**: no `Co-authored-by:` trailer and no `Generated with …`
+  line. AI-assisted contributions are welcome; you are the author and responsible for what you
+  submit, and the history credits people, not tools. The `no-co-authors` hook refuses such a
+  message at `commit-msg` (rewrite the message); the squash-merge message follows the same rule.
 
 ## Releases
 

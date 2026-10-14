@@ -1,0 +1,21 @@
+# `pre-commit install` sets up both stages (see CONTRIBUTING.md). Tests, lint and Terraform
+# checks run in CI on every pull request, not here.
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+
+# Without this, every hook also runs at commit-msg, against the message file.
+default_stages:
+  - pre-commit
+
+repos:
+  - repo: local
+    hooks:
+      - id: no-co-authors
+        name: no co-authors in commit message
+        entry: '^\s*co-authored-by:|\bgenerated with\b'
+        language: pygrep
+        args:
+          - --ignore-case
+        stages:
+          - commit-msg
