@@ -10,11 +10,11 @@ only need the settings this module outputs (`envrc`).
 
 ```hcl
 module "duckless" {
-  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.4.1"
+  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.4.2"
 
   project_id        = "my-project"
   region            = "europe-west1"
-  runner_image_tag  = "0.4.1"
+  runner_image_tag  = "0.4.2"
   data_buckets      = ["my-lake"]
   bigquery_datasets = ["sales"]
 }
