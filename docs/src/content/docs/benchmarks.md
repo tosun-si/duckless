@@ -1,6 +1,6 @@
 ---
-title: Benchmarks
-description: TPC-H SF100 against BigQuery, a Cloud Run job, spill and GCS write throughput.
+title: "Benchmarks: DuckDB vs BigQuery"
+description: "TPC-H on 100 GB of Parquet: DuckDB on Google Cloud against BigQuery on-demand, in query time, startup and cost per run; Cloud Run against Cloud Batch; spill and GCS writes."
 ---
 
 All numbers come from single runs in `europe-west1`, between 30 September and 5 October

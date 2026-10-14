@@ -1,6 +1,6 @@
 ---
 title: Examples
-description: Pipelines you can run as they are, from generated data to marts and DuckLake tables.
+description: "DuckDB pipelines on Google Cloud you can run as they are: daily marts, DuckLake corrections, data validation, Soda checks, BigQuery to Python."
 ---
 
 The [`examples/`](https://github.com/tosun-si/duckless/tree/main/examples) folder of the

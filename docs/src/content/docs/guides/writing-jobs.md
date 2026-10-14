@@ -1,6 +1,6 @@
 ---
-title: Writing jobs
-description: SQL files, Python scripts and your own images, and the few habits that make them fast.
+title: Writing DuckDB jobs
+description: "DuckDB jobs in SQL or Python on GCS: reading big CSV and Parquet files fast, writing Parquet in parallel, custom images."
 ---
 
 A job is one of three things:

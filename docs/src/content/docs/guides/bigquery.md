@@ -1,6 +1,6 @@
 ---
-title: Reading BigQuery
-description: Read BigQuery tables from jobs, in SQL or Python, through the Storage Read API.
+title: Reading BigQuery from DuckDB
+description: "Query BigQuery tables from DuckDB, in SQL or Python, with the Storage Read API: only the columns and rows a job needs leave BigQuery."
 ---
 
 Jobs read BigQuery tables directly, with DuckDB's `bigquery` extension (baked into the runner):

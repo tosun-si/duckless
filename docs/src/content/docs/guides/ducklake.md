@@ -1,6 +1,6 @@
 ---
-title: DuckLake tables
-description: Tables with snapshots, time travel and concurrent writers, stored as Parquet on GCS with a Cloud SQL catalog.
+title: DuckLake on Google Cloud
+description: "DuckLake tables on GCS with a Cloud SQL Postgres catalog: snapshots, time travel and concurrent writers, from DuckDB jobs."
 ---
 
 [DuckLake](https://ducklake.select) turns Parquet files on GCS into tables: `INSERT`,

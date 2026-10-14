@@ -1,6 +1,6 @@
 ---
-title: Machines, Spot and spill
-description: Picking a machine, local SSD for spill, Spot VMs and quotas.
+title: "Cloud Run or Cloud Batch: machines, Spot and spill"
+description: "Run DuckDB on Cloud Run Jobs or Cloud Batch: choosing the machine, startup times, local SSD for spill, Spot VMs and quotas."
 ---
 
 ## Cloud Batch or Cloud Run Jobs

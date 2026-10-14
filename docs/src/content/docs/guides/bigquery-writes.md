@@ -1,6 +1,6 @@
 ---
-title: Writing to BigQuery
-description: Write a DuckDB result to a BigQuery table with a free load job, and replace partitions or merge at the lowest cost.
+title: Writing to BigQuery from DuckDB
+description: "Write a DuckDB result to BigQuery: a free load job, then replace partitions or a pruned MERGE that bills only the data written, never the table."
 ---
 
 A job transforms with DuckDB, then writes the result to BigQuery with one call:

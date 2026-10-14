@@ -1,6 +1,6 @@
 ---
 title: Quick start
-description: Install the CLI, set up a project and run a first job in about ten minutes.
+description: Install DuckLess, set up a GCP project and run a first DuckDB job on Google Cloud in about ten minutes.
 ---
 
 ## Before you start
