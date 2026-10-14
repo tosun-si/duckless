@@ -17,6 +17,7 @@ export default defineConfig({
 			head: [
 				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://tosun-si.github.io/duckless/duckless-social.png' } },
 				{ tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
+				{ tag: 'meta', attrs: { name: 'google-site-verification', content: '-xq5HYdfVG-eQKeQ2awJMq7AkMeWgp2nfCaw0m8chcg' } },
 			],
 			description:
 				'Serverless DuckDB on Google Cloud: run SQL or your own code on a right-sized VM in your project, then tear it down.',
