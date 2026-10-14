@@ -54,6 +54,18 @@ log("done", rows=123)  # structured log line, visible in `duckless logs`
   columns, where)` in Python (a DuckDB relation: SQL, Arrow batches, pandas, Polars). Select the columns
   and filter: only those leave BigQuery. Needs `init --bigquery-dataset <dataset>`; large tables
   read much faster on Cloud Batch (`--on batch`) than on Cloud Run.
+- **Writing to BigQuery:** `to_bigquery(con, query, "project.dataset.table", mode=...)` (Parquet on the
+  work bucket, then a free load job). Pick the mode for cost, never a plain MERGE by habit:
+  - `replace_partitions` when each batch holds the **complete** content of every partition it touches
+    (a close rewrites its month, a daily load its day): bills 10 MB + the new rows, never the table.
+    Wrong on a table partitioned by load date, or by month with a batch of a few days: it deletes
+    whole partitions. Ask the user when unsure; it is their data's contract.
+  - `merge` with `key=[...]` for partial batches (corrections). Put the partition column in the key,
+    or `prune=True` if a row never changes partition: the MERGE then reads only the touched
+    partitions. A `bigquery_merge_not_pruned` log means it read the whole table.
+  - `append` / `replace` (whole table) need no existing table (`partition_by`, `cluster_by` create it).
+    On Spot, avoid `append`: a retried job loads its rows twice.
+  - `max_bytes_billed=` caps the SQL step. Needs `init --bigquery-write-dataset <dataset>`.
 - **Custom images** start `FROM ghcr.io/tosun-si/duckless-runner:<version>` to keep
   `duckless_runtime` and the extensions; the runner service account needs
   `roles/artifactregistry.reader` on the image's repository.

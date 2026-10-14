@@ -36,7 +36,7 @@ API and IAM role, split into DuckLess, DuckLake, BigQuery and job submitters.
 | --- | --- |
 | Terraform | `>= 1.5` |
 | Provider `hashicorp/google` | `>= 7.18` (validated in CI with 7.18.0 and the latest release) |
-| Applying identity | can enable services, create a service account, a bucket and an Artifact Registry repository, and grant project roles to the runner account. With `ducklake`: create a Cloud SQL instance. With `bigquery_datasets`: manage the IAM of those datasets. |
+| Applying identity | can enable services, create a service account, a bucket and an Artifact Registry repository, and grant project roles to the runner account. With `ducklake`: create a Cloud SQL instance. With `bigquery_datasets` or `bigquery_write_datasets`: manage the IAM of those datasets. |
 
 The module only sets a minimum provider version: your root module and its lock file decide the
 exact one. A DuckLess release that needs a newer minimum says so in its release notes.
@@ -52,6 +52,7 @@ exact one. A DuckLess release that needs a newer minimum says so in its release 
 | `data_buckets` | `[]` | buckets the jobs read and write, in any project (the work bucket is always included) |
 | `bigquery_datasets` | `[]` | BigQuery datasets the jobs read: `dataset` (this project) or `project.dataset` |
 | `bigquery_jobs` | `false` | let jobs run BigQuery queries (`bigquery_query`, `ATTACH`) |
+| `bigquery_write_datasets` | `[]` | BigQuery datasets the jobs write (`to_bigquery`): `dataset` or `project.dataset` |
 | `ducklake` | `false` | create a DuckLake catalog: Cloud SQL Postgres, private IP, IAM authentication, backups |
 | `network`, `subnetwork` | `default` | network of the jobs and of the catalog: a name in this project, or a full path for a Shared VPC |
 | `catalog_tier` | `db-g1-small` | Cloud SQL tier of the catalog |
@@ -70,7 +71,7 @@ exact one. A DuckLess release that needs a newer minimum says so in its release 
 | `envrc` | the `export DUCKLESS_…` lines the CLI reads |
 | `work_bucket`, `runner_service_account`, `runner_image` | the settings, one by one |
 | `ducklake_instance`, `ducklake_data_path` | the catalog, when `ducklake` is on |
-| `network`, `subnetwork`, `bigquery_datasets`, `bigquery_jobs` | echoed inputs (`duckless init` keeps them on upgrades) |
+| `network`, `subnetwork`, `bigquery_datasets`, `bigquery_jobs`, `bigquery_write_datasets` | echoed inputs (`duckless init` keeps them on upgrades) |
 
 ## DuckLake and the network
 
