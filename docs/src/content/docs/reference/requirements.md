@@ -56,10 +56,45 @@ The identity the jobs run as (Batch VMs and Cloud Run jobs).
 
 ### Runner image
 
-`ghcr.io/tosun-si/duckless-runner:<version>`, the same version as the CLI. Job VMs have no external
-IP, so the image must come from a registry reachable through Private Google Access: an Artifact
-Registry **remote repository** proxying `https://ghcr.io` (what the module creates), or a copy in
-your internal registry. Images for `duckless exec` should be built `FROM` it.
+`ghcr.io/tosun-si/duckless-runner:<version>`, the same version as the CLI. It is published on
+GitHub only. Job VMs have no external IP, so they can't pull it from there: the image must come
+from a registry they reach through Private Google Access. Two ways:
+
+| | Remote repository (the module's default) | Copy in a standard repository |
+| --- | --- | --- |
+| What it is | an Artifact Registry `REMOTE_REPOSITORY` proxying `https://ghcr.io`: it pulls a version from GitHub on first use, then serves it from the region | the image copied by your CI into a standard Artifact Registry repository, and used by digest |
+| Upkeep | none | a copy per DuckLess version |
+| Jobs depend on GitHub | for the first pull of each version only | never |
+| Fits | most projects | a supply-chain policy: images scanned and approved before use, nothing pulled from outside at run time |
+
+Both keep the VMs without external IP and without Cloud NAT, serve the image from the region,
+and leave one place to control and audit with IAM; both work inside a VPC Service Controls
+perimeter.
+
+**Check where an image comes from.** Every runner image carries a signed
+[SLSA provenance](https://slsa.dev) attestation, made by the release workflow of this repository:
+
+```bash
+gh attestation verify oci://ghcr.io/tosun-si/duckless-runner:0.4.2 --owner tosun-si
+```
+
+**Copy it into a standard repository.** The copy keeps the image's digest, so the attestation
+still covers it:
+
+```bash
+REPO=europe-west1-docker.pkg.dev/my-project/images
+docker buildx imagetools create --tag "$REPO/duckless-runner:0.4.2" ghcr.io/tosun-si/duckless-runner:0.4.2
+docker buildx imagetools inspect "$REPO/duckless-runner:0.4.2" --format '{{json .Manifest.Digest}}'
+```
+
+Then point jobs at it by digest, so a moved tag can never change what runs:
+
+```bash
+export DUCKLESS_IMAGE=europe-west1-docker.pkg.dev/my-project/images/duckless-runner@sha256:<digest>
+```
+
+The runner service account needs `roles/artifactregistry.reader` on that repository. Images for
+`duckless exec` should be built `FROM` the runner image, wherever it comes from.
 
 ### Network
 
