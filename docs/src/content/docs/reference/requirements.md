@@ -75,7 +75,7 @@ perimeter.
 [SLSA provenance](https://slsa.dev) attestation, made by the release workflow of this repository:
 
 ```bash
-gh attestation verify oci://ghcr.io/tosun-si/duckless-runner:0.4.2 --owner tosun-si
+gh attestation verify oci://ghcr.io/tosun-si/duckless-runner:0.4.3 --owner tosun-si
 ```
 
 **Copy it into a standard repository.** The copy keeps the image's digest, so the attestation
@@ -83,8 +83,8 @@ still covers it:
 
 ```bash
 REPO=europe-west1-docker.pkg.dev/my-project/images
-docker buildx imagetools create --tag "$REPO/duckless-runner:0.4.2" ghcr.io/tosun-si/duckless-runner:0.4.2
-docker buildx imagetools inspect "$REPO/duckless-runner:0.4.2" --format '{{json .Manifest.Digest}}'
+docker buildx imagetools create --tag "$REPO/duckless-runner:0.4.3" ghcr.io/tosun-si/duckless-runner:0.4.3
+docker buildx imagetools inspect "$REPO/duckless-runner:0.4.3" --format '{{json .Manifest.Digest}}'
 ```
 
 Then point jobs at it by digest, so a moved tag can never change what runs:
