@@ -30,6 +30,7 @@ Set for every job, readable from SQL (`${VAR}`) and Python (`os.environ`):
 | `DUCKLESS_JOB_ID` | the job id |
 | `DUCKLESS_BUCKET` | the work bucket |
 | `DUCKLESS_METRICS_URI` | where the runner writes its metrics |
+| `DUCKLESS_IMAGE_REF`, `DUCKLESS_CLI_VERSION` | the image and the CLI version, recorded in the metrics |
 | `DUCKLESS_DUCKLAKE_INSTANCE`, `_DATA_PATH`, `_USER` | the catalog to attach, when the installation has one |
 | `GOOGLE_CLOUD_PROJECT` | the project |
 

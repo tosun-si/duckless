@@ -50,7 +50,8 @@ def run_job(
     # Everything that can be rejected is rejected before the upload.
     draft = plan_job(request, default_image=default_image, now=clock(), nonce=nonce())
     source_uri = artifact_store.upload_source(draft.job_id, request.source) if request.source else None
-    env = merged_env(request.env, {**(platform_env or {}), **artifact_store.runner_env(draft.job_id)})
+    run_facts = {"DUCKLESS_IMAGE_REF": draft.image}  # recorded in the job's metrics
+    env = merged_env(request.env, {**(platform_env or {}), **run_facts, **artifact_store.runner_env(draft.job_id)})
     return executor.submit(replace(draft, source_uri=source_uri, env=env))
 
 

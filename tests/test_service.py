@@ -80,6 +80,16 @@ class TestRunJob:
         assert env["DUCKLESS_BUCKET"] == "work"
         assert env["TPCH_SF"] == "100"
 
+    def test_given_a_job_when_running_then_the_runner_gets_the_image_to_record(
+        self, run: Callable[[JobRequest], JobStatus], executor: FakeExecutor, sql_file: Path
+    ) -> None:
+        # when
+        status = run(JobRequest(machine="n2-highmem-16", source=sql_file))
+
+        # then: the runner writes it into the job's metrics
+        spec = executor.submitted[status.job_id]
+        assert dict(spec.env)["DUCKLESS_IMAGE_REF"] == spec.image
+
     def test_given_image_and_command_when_running_then_submits_command_without_upload(
         self, run: Callable[[JobRequest], JobStatus], executor: FakeExecutor, artifact_store: FakeArtifactStore
     ) -> None:

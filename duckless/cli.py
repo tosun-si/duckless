@@ -76,10 +76,17 @@ def metrics_lines(metrics: Mapping[str, Any] | None) -> list[str]:
         f"  peak rss {metrics.get('peak_rss_gb')} GB  spill {metrics.get('peak_spill_gb')} GB"
     )
     error = [f"  error: {metrics['error']}"] if metrics.get("error") else []
+    duckdb_version = (metrics.get("versions") or {}).get("duckdb")
+    sha = metrics.get("source_sha256")
+    ran = [f"  ran {metrics.get('image')}  duckdb {duckdb_version}  source sha256 {sha[:12]}"] if sha else []
+    writes = [
+        f"  bigquery {w['mode']} {w['table']}  {w['rows']} rows  billed {w['bytes_billed'] / 1024**2:.0f} MB"
+        for w in metrics.get("bigquery_writes") or ()
+    ]
     steps = [
         f"  {s['seconds']:>9.2f}s  {s['type']:<7} {' '.join(s['sql'].split())[:80]}" for s in metrics.get("steps", ())
     ]
-    return [summary, *error, *steps]
+    return [summary, *error, *ran, *writes, *steps]
 
 
 def last_preview(metrics: Mapping[str, Any] | None) -> list[list[str]]:

@@ -20,13 +20,15 @@ import contextlib
 import os
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 import duckdb
 
 from duckless_runtime.bigquery import table_path
 
 MODES = ("append", "replace", "replace_partitions", "merge")
+# What this process wrote to BigQuery: the runner adds it to the job's metrics.
+_WRITES: list[dict] = []
 STAGING_MODES = frozenset({"replace_partitions", "merge"})
 STAGING_TTL_SECONDS = 24 * 3600
 TIME_UNITS = frozenset({"HOUR", "DAY", "MONTH", "YEAR"})
@@ -377,6 +379,7 @@ def to_bigquery(
 
     seconds["total"] = round(time.monotonic() - started, 2)
     result = WriteResult(table, mode, rows, bytes_billed, seconds)
+    _WRITES.append(asdict(result))
     log("bigquery_written", table=table, mode=mode, rows=rows, bytes_billed=bytes_billed, seconds=seconds)
     if mode == "merge" and target.partitioning and not should_prune(target.partitioning, key, prune):
         log(
@@ -386,6 +389,11 @@ def to_bigquery(
             hint=f"the MERGE read every partition: add {target.partitioning.column} to the key, or prune=True",
         )
     return result
+
+
+def written_to_bigquery() -> tuple[dict, ...]:
+    """Every to_bigquery call of this process: table, mode, rows, bytes billed, seconds."""
+    return tuple(_WRITES)
 
 
 def _in(seconds: int):
