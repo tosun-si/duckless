@@ -46,7 +46,10 @@ def stage_locally(uri: str, directory: str | Path | None = None, parallel_reads:
 
     fs = pafs.GcsFileSystem()
     source = uri.removeprefix("gs://")
-    size = fs.get_file_info(source).size
+    info = fs.get_file_info(source)
+    if info.type == pafs.FileType.NotFound:
+        raise FileNotFoundError(f"{uri} does not exist (or the job's service account can't see it)")
+    size = info.size
     with open(target, "wb") as out:
         out.truncate(size)
 

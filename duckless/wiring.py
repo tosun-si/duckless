@@ -85,7 +85,7 @@ def gcp_services(settings: Settings) -> Services:
             default_image=settings.image,
             clock=lambda: datetime.now(UTC),
             nonce=lambda: uuid.uuid4().hex,
-            platform_env=lake_env(settings.lake),
+            platform_env={**lake_env(settings.lake), "DUCKLESS_CLI_VERSION": cli_version()},
         ),
         get_job=lambda job_id: service.get_job(job_id, executor=executor(), artifact_store=artifact_store()),
         job_logs=lambda job_id, since: service.job_logs(

@@ -60,3 +60,41 @@ class TestGoogleErrors:
 
         # when / then
         assert "gcloud auth login --update-adc" in google_error_line(RefreshError("Reauthentication is needed."))
+
+
+class TestRunFactsInStatus:
+    def test_given_metrics_with_run_facts_when_rendering_then_image_versions_and_writes_shown(self) -> None:
+        # given
+        from duckless.cli import metrics_lines
+
+        metrics = {
+            "status": "succeeded",
+            "seconds": 12.5,
+            "peak_rss_gb": 3.1,
+            "peak_spill_gb": 0.0,
+            "image": "europe-west1-docker.pkg.dev/p/duckless-runner/tosun-si/duckless-runner:0.4.3",
+            "source_sha256": "ab12cd34ef56" + "0" * 52,
+            "versions": {"duckdb": "1.5.6"},
+            "bigquery_writes": [
+                {"table": "p.finance.lines", "mode": "replace_partitions", "rows": 500, "bytes_billed": 31457280}
+            ],
+        }
+
+        # when
+        lines = metrics_lines(metrics)
+
+        # then
+        assert any(
+            "duckless-runner:0.4.3" in line and "duckdb 1.5.6" in line and "ab12cd34ef56" in line for line in lines
+        )
+        assert "  bigquery replace_partitions p.finance.lines  500 rows  billed 30 MB" in lines
+
+    def test_given_metrics_of_an_older_runner_when_rendering_then_no_run_facts_line(self) -> None:
+        # given
+        from duckless.cli import metrics_lines
+
+        # when
+        lines = metrics_lines({"status": "succeeded", "seconds": 1, "peak_rss_gb": 1, "peak_spill_gb": 0})
+
+        # then
+        assert len(lines) == 1

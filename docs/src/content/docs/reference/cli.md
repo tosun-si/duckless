@@ -65,7 +65,13 @@ Both take:
 ### `duckless status <job-id>`
 
 State, timeline, and once the job is over, the runner's metrics: duration of each
-statement, peak memory, peak spill.
+statement, peak memory, peak spill, and what ran: the image, the DuckDB version, the sha256 of the
+job's SQL or script, and each `to_bigquery` write (table, mode, rows, bytes billed).
+
+The metrics are kept in the work bucket as `runs/<job-id>/metrics.json`, with the versions of the
+CLI, the runner and every DuckDB extension the job loaded. They follow the bucket's `runs/`
+lifecycle rule (30 days by default, `runs_retention_days` in the module): raise it to keep a
+longer history of what ran.
 
 ### `duckless logs <job-id>`
 

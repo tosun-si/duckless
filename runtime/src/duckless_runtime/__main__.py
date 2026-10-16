@@ -6,6 +6,7 @@
 Env: DUCKLESS_JOB_ID, DUCKLESS_METRICS_URI (gs://…/metrics.json).
 """
 
+import hashlib
 import json
 import os
 import resource
@@ -17,12 +18,14 @@ import time
 from collections.abc import Iterator, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import asdict
+from importlib import metadata
 from pathlib import Path
 from string import Template
 
 import duckdb
 
 from duckless_runtime import connect, log, runtime_settings
+from duckless_runtime.bigquery_write import written_to_bigquery
 
 PREVIEW_ROWS = 20
 GCS_SCHEMES = ("gs://", "gcs://", "gcss://")
@@ -103,15 +106,40 @@ def run_python(source: str, args: list[str]) -> dict:
     return {}
 
 
+def source_sha256(source: str) -> str:
+    """Fingerprint of the code that ran, to tell two runs of a job apart afterwards."""
+    return hashlib.sha256(source.encode()).hexdigest()
+
+
+def versions(con: duckdb.DuckDBPyConnection) -> dict:
+    """The CLI that submitted the job, the runner and DuckDB with the extensions it loaded."""
+    try:
+        loaded = dict(
+            con.sql(
+                "SELECT extension_name, extension_version FROM duckdb_extensions() WHERE loaded ORDER BY 1"
+            ).fetchall()
+        )
+    except duckdb.Error:
+        loaded = {}
+    return {
+        "cli": os.environ.get("DUCKLESS_CLI_VERSION"),
+        "runtime": metadata.version("duckless-runtime"),
+        "duckdb": duckdb.__version__,
+        "extensions": loaded,
+    }
+
+
 def run_job(con: duckdb.DuckDBPyConnection, mode: str, uri: str, args: list[str]) -> dict:
+    facts: dict = {}
     try:
         source = read_source(con, uri)
+        facts = {"source_sha256": source_sha256(source)}
         outcome = run_sql(con, source) if mode == "sql" else run_python(source, args)
-        return {"status": "succeeded", **outcome}
+        return {"status": "succeeded", **facts, **outcome}
     except Exception as e:
         error = f"{type(e).__name__}: {e}"
         log("job_failed", severity="ERROR", error=error)
-        return {"status": "failed", "error": error}
+        return {"status": "failed", **facts, "error": error}
 
 
 def write_metrics(con: duckdb.DuckDBPyConnection, uri: str | None, metrics: dict) -> None:
@@ -147,6 +175,9 @@ def main(argv: list[str]) -> int:
         "seconds": round(time.time() - started, 3),
         "peak_rss_gb": to_gb(peak_rss_bytes(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, sys.platform)),
         "peak_spill_gb": to_gb(peak_spill.result()),
+        "image": os.environ.get("DUCKLESS_IMAGE_REF"),
+        "versions": versions(con),
+        "bigquery_writes": written_to_bigquery(),
     }
     log("job_done", **{k: v for k, v in metrics.items() if k != "steps"})
     write_metrics(con, os.environ.get("DUCKLESS_METRICS_URI"), metrics)
