@@ -22,11 +22,11 @@ created does not matter. Two ways to create them:
 
 ```hcl
 module "duckless" {
-  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.5.0"
+  source = "git::https://github.com/tosun-si/duckless.git//duckless/terraform?ref=v0.6.0"
 
   project_id        = "my-project"
   region            = "europe-west1"
-  runner_image_tag  = "0.5.0"
+  runner_image_tag  = "0.6.0"
   data_buckets      = ["my-lake"]
   bigquery_datasets = ["sales"]
 }

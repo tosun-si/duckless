@@ -1,6 +1,6 @@
 [project]
 name = "airflow-provider-duckless"
-version = "0.5.0"
+version = "0.6.0"
 description = "Apache Airflow provider for DuckLess: run DuckDB jobs on Google Cloud from a DAG, deferrable"
 readme = "README.md"
 license = "Apache-2.0"
@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "duckless>=0.5.0",
+    "duckless>=0.6.0",
     "apache-airflow>=2.10",
 ]
 
