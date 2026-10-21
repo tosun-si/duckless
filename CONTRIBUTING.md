@@ -15,7 +15,8 @@ Thanks for considering it. Bug reports, real use cases, docs fixes and code are 
 
 ## Setup
 
-Python 3.13 and [uv](https://docs.astral.sh/uv/).
+Python 3.13 and [uv](https://docs.astral.sh/uv/). The CLI and the Python API also support 3.11 and
+3.12 (orchestrators such as Cloud Composer run them); CI checks both. The runner image stays on 3.13.
 
 ```bash
 git clone https://github.com/tosun-si/duckless.git

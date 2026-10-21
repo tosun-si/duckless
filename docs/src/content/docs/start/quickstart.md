@@ -9,7 +9,7 @@ description: Install DuckLess, set up a GCP project and run a first DuckDB job o
   service accounts and grant IAM roles on it (`roles/owner` is the simple case).
 - [Application Default Credentials](https://cloud.google.com/docs/authentication/provide-credentials-adc):
   `gcloud auth application-default login`.
-- Python 3.13 and [uv](https://docs.astral.sh/uv/) (or pip).
+- Python 3.11 or later and [uv](https://docs.astral.sh/uv/) (or pip).
 - A subnetwork with **Private Google Access** in the region you use: job VMs have no
   external IP. The `default` network has it on in most regions; check with
   `gcloud compute networks subnets describe default --region <region> --format="value(privateIpGoogleAccess)"`.
