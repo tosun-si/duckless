@@ -29,7 +29,7 @@ dependencies = [
     "google-cloud-config>=0.7",
     "google-cloud-compute>=1.20",
     "google-cloud-logging>=3.11",
-    "google-cloud-run>=0.16",
+    "google-cloud-run>=0.10.14",  # the version Airflow 2.10 pins (Cloud Composer)
     "google-cloud-storage>=2.18",
 ]
 

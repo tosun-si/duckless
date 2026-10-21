@@ -373,7 +373,7 @@ requires-dist = [
     { name = "google-cloud-compute", specifier = ">=1.20" },
     { name = "google-cloud-config", specifier = ">=0.7" },
     { name = "google-cloud-logging", specifier = ">=3.11" },
-    { name = "google-cloud-run", specifier = ">=0.16" },
+    { name = "google-cloud-run", specifier = ">=0.10.14" },
     { name = "google-cloud-storage", specifier = ">=2.18" },
     { name = "typer", specifier = ">=0.15" },
 ]
