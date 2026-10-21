@@ -111,7 +111,7 @@ To get `duckless_runtime` and the DuckDB extensions in your image, build it `FRO
 runner image:
 
 ```dockerfile
-FROM ghcr.io/tosun-si/duckless-runner:0.5.0
+FROM ghcr.io/tosun-si/duckless-runner:0.6.0
 COPY --chown=app:app my_project/ ./my_project/
 ```
 

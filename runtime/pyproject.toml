@@ -1,6 +1,6 @@
 [project]
 name = "duckless-runtime"
-version = "0.5.0"
+version = "0.6.0"
 description = "DuckLess runner: DuckDB tuned for the VM, GCS via ADC"
 requires-python = ">=3.13"
 dependencies = [
