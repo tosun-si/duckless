@@ -1,3 +1,4 @@
+import pytest
 from google.cloud import batch_v1
 
 from duckless.adapters.batch import build_job, container_invocation, status_from_job
@@ -114,3 +115,56 @@ class TestStatusFromJob:
         # then
         assert (status.job_id, status.uid, status.state) == ("dl-job-1", "dl-job-1-uid", JobState.RUNNING)
         assert status.spot
+
+
+class TestOlderBatchClients:
+    """Airflow 2.10 pins google-cloud-batch 0.17.33, which has no CANCELLED state and no cancel_job."""
+
+    def test_given_a_client_without_cancelled_when_mapping_states_then_the_others_still_map(self) -> None:
+        # given
+        import enum
+
+        from duckless.adapters.batch import batch_states
+
+        class OldState(enum.IntEnum):
+            QUEUED = 1
+            SCHEDULED = 2
+            RUNNING = 3
+            SUCCEEDED = 4
+            FAILED = 5
+
+        # when
+        states = batch_states(OldState)
+
+        # then
+        assert states == {
+            OldState.QUEUED: JobState.QUEUED,
+            OldState.SCHEDULED: JobState.SCHEDULED,
+            OldState.RUNNING: JobState.RUNNING,
+            OldState.SUCCEEDED: JobState.SUCCEEDED,
+            OldState.FAILED: JobState.FAILED,
+        }
+
+    @pytest.mark.skipif(
+        not hasattr(batch_v1.JobStatus.State, "CANCELLED"), reason="an older google-cloud-batch is installed"
+    )
+    def test_given_the_current_client_when_mapping_states_then_cancelled_included(self) -> None:
+        # given
+        from duckless.adapters.batch import batch_states
+
+        # when / then
+        assert batch_states(batch_v1.JobStatus.State)[batch_v1.JobStatus.State.CANCELLED] is JobState.CANCELLED
+
+    def test_given_a_client_without_cancel_job_when_cancelling_then_says_which_version(self) -> None:
+        # given
+        from duckless.adapters.batch import BatchExecutor
+        from duckless.core.errors import DucklessError
+
+        class OldClient:
+            pass
+
+        executor = BatchExecutor(OldClient(), SETTINGS)
+
+        # when / then
+        with pytest.raises(DucklessError, match=r"google-cloud-batch>=0\.17\.34"):
+            executor.cancel("dl-job-1")

@@ -34,6 +34,22 @@ jobs:
         working-directory: runtime
         run: uv sync --frozen && uv run --with pytest pytest -q tests ../examples
 
+  # The CLI and the Python API install in orchestrators (Cloud Composer, Airflow) that run older
+  # Pythons than the runner image: the oldest supported versions must keep passing.
+  python-versions:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tag upstream
+        with:
+          enable-cache: true
+      - run: uv python install ${{ matrix.python }}
+      - run: uv sync --frozen --python ${{ matrix.python }}
+      - run: uv run --python ${{ matrix.python }} pytest -q
+
   terraform:
     runs-on: ubuntu-latest
     defaults:
