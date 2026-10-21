@@ -3,7 +3,7 @@
 from google.api_core.exceptions import NotFound
 from google.cloud import batch_v1
 
-from duckless.core.errors import JobNotFoundError
+from duckless.core.errors import DucklessError, JobNotFoundError
 from duckless.core.job import JobEvent, JobKind, JobSpec, JobState, JobStatus
 from duckless.core.machine import LOCAL_SSD_GB
 from duckless.settings import Settings
@@ -15,14 +15,24 @@ SCRATCH_DEVICE = "scratch"
 RUNNER_EXIT_CODES = (1, 2)
 MAX_RETRIES = 2
 
-_STATES = {
-    batch_v1.JobStatus.State.QUEUED: JobState.QUEUED,
-    batch_v1.JobStatus.State.SCHEDULED: JobState.SCHEDULED,
-    batch_v1.JobStatus.State.RUNNING: JobState.RUNNING,
-    batch_v1.JobStatus.State.SUCCEEDED: JobState.SUCCEEDED,
-    batch_v1.JobStatus.State.FAILED: JobState.FAILED,
-    batch_v1.JobStatus.State.CANCELLED: JobState.CANCELLED,
-}
+# CANCELLED and cancel_job came with google-cloud-batch 0.17.34; Airflow 2.10 pins 0.17.33.
+CANCEL_MIN_VERSION = "0.17.34"
+
+
+def batch_states(states) -> dict:
+    """Batch states the installed client knows, mapped to DuckLess states."""
+    names = {
+        "QUEUED": JobState.QUEUED,
+        "SCHEDULED": JobState.SCHEDULED,
+        "RUNNING": JobState.RUNNING,
+        "SUCCEEDED": JobState.SUCCEEDED,
+        "FAILED": JobState.FAILED,
+        "CANCELLED": JobState.CANCELLED,
+    }
+    return {getattr(states, name): state for name, state in names.items() if hasattr(states, name)}
+
+
+_STATES = batch_states(batch_v1.JobStatus.State)
 
 
 # ---------- pure ----------
@@ -142,6 +152,11 @@ class BatchExecutor:
             raise JobNotFoundError(job_id) from e
 
     def cancel(self, job_id: str) -> None:
+        if not hasattr(self._client, "cancel_job"):
+            raise DucklessError(
+                f"cancelling a Batch job needs google-cloud-batch>={CANCEL_MIN_VERSION}; this environment has an "
+                "older one (Airflow 2.10 pins 0.17.33): upgrade it, or cancel with the duckless CLI"
+            )
         try:
             self._client.cancel_job(name=self._name(job_id))
         except NotFound as e:
