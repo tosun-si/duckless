@@ -89,8 +89,9 @@ Full guide: [tosun-si.github.io/duckless](https://tosun-si.github.io/duckless/),
   ([guide](https://tosun-si.github.io/duckless/guides/bigquery-writes/);
   `duckless init --bigquery-write-dataset <dataset>` first).
 - **Python API**: `duckless.Client.from_env().run(...)`, `wait`, `cancel`, `logs`, to run jobs from
-  Airflow / Cloud Composer, scripts or notebooks
-  ([guide](https://tosun-si.github.io/duckless/guides/python-api/)).
+  scripts or notebooks ([guide](https://tosun-si.github.io/duckless/guides/python-api/)).
+- **Airflow and Cloud Composer**: `pip install airflow-provider-duckless`, then `DuckLessRunOperator`,
+  deferrable, on Airflow 2.10 and 3 ([guide](https://tosun-si.github.io/duckless/guides/airflow/)).
 
 More in [Writing jobs](https://tosun-si.github.io/duckless/guides/writing-jobs/) and
 [Machines, Spot and spill](https://tosun-si.github.io/duckless/guides/machines/).

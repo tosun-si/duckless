@@ -71,36 +71,5 @@ duration and last rows, and what ran (image, versions, source sha256, BigQuery w
 
 ## From Airflow (Cloud Composer)
 
-Install `duckless` in the environment (Composer: *PyPI packages*), set the `DUCKLESS_*` settings as
-environment variables, and give the environment's service account the
-[job submitter roles](/duckless/reference/requirements/#4-job-submitters) (`job_submitters` in the
-Terraform module). A task then runs a job:
-
-```python
-import pendulum
-from airflow.decorators import dag, task
-
-
-@dag(schedule="0 6 * * *", start_date=pendulum.datetime(2026, 10, 1, tz="UTC"), catchup=False)
-def daily_quality_checks():
-    @task
-    def run_checks(ds=None) -> dict:
-        import duckless
-
-        client = duckless.Client.from_env()
-        job = client.run("/home/airflow/gcs/dags/jobs/checks.py", machine="n2-highmem-8", env={"DAY": ds})
-        try:
-            report = client.wait(job.job_id, check=True)
-        except BaseException:
-            client.cancel(job.job_id)  # the task failed or was killed: don't leave the job running
-            raise
-        return {"job_id": job.job_id, "seconds": report.metrics["seconds"]}
-
-    run_checks()
-
-
-daily_quality_checks()
-```
-
-The task waits in a worker slot while the job runs. That's fine for jobs of a few minutes; for
-long jobs, a deferrable operator that waits in the triggerer instead is planned.
+Use the [DuckLess operator](/duckless/guides/airflow/): it waits for the job in the triggerer instead
+of a worker, fails the task with the runner's error and pushes a summary of the job to XCom.

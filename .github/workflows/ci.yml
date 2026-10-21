@@ -50,6 +50,29 @@ jobs:
       - run: uv sync --frozen --python ${{ matrix.python }}
       - run: uv run --python ${{ matrix.python }} pytest -q
 
+  # The Airflow provider, installed the way an Airflow environment (Cloud Composer) does: with
+  # Airflow's own constraints file, which pins google-cloud-* and protobuf. duckless's tests run
+  # there too, with those pinned versions.
+  airflow-provider:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        airflow: ["2.10.5", "3.3.2"]
+    env:
+      PYTHON: "3.12"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tag upstream
+        with:
+          enable-cache: true
+      - run: uv venv --python "$PYTHON" .venv-airflow
+      - run: >-
+          VIRTUAL_ENV=.venv-airflow uv pip install "apache-airflow==${{ matrix.airflow }}" -e . -e airflow pytest
+          -c "https://raw.githubusercontent.com/apache/airflow/constraints-${{ matrix.airflow }}/constraints-$PYTHON.txt"
+      - run: .venv-airflow/bin/python -m pytest -q airflow/tests
+      - run: .venv-airflow/bin/python -m pytest -q tests
+
   terraform:
     runs-on: ubuntu-latest
     defaults:
