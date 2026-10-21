@@ -54,6 +54,9 @@ log("done", rows=123)  # structured log line, visible in `duckless logs`
   columns, where)` in Python (a DuckDB relation: SQL, Arrow batches, pandas, Polars). Select the columns
   and filter: only those leave BigQuery. Needs `init --bigquery-dataset <dataset>`; large tables
   read much faster on Cloud Batch (`--on batch`) than on Cloud Run.
+- **Running jobs from code** (Airflow / Cloud Composer, scripts): `duckless.Client.from_env()`, then
+  `run(...)`, `wait(job_id, check=True)` (raises `JobFailedError`), `cancel`, `logs`. In an Airflow
+  task, cancel the job in an `except BaseException` so a killed task doesn't leave it running.
 - **Writing to BigQuery:** `to_bigquery(con, query, "project.dataset.table", mode=...)` (Parquet on the
   work bucket, then a free load job). Pick the mode for cost, never a plain MERGE by habit:
   - `replace_partitions` when each batch holds the **complete** content of every partition it touches

@@ -40,6 +40,7 @@ export default defineConfig({
 						{ label: 'DuckLake tables', slug: 'guides/ducklake' },
 						{ label: 'Reading BigQuery', slug: 'guides/bigquery' },
 						{ label: 'Writing to BigQuery', slug: 'guides/bigquery-writes' },
+						{ label: 'Python API and Airflow', slug: 'guides/python-api' },
 						{ label: 'Agent Skills', slug: 'guides/agent-skills' },
 						{ label: 'Infrastructure', slug: 'guides/infrastructure' },
 					],
