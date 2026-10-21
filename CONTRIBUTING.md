@@ -38,6 +38,7 @@ repository's own hooks with
 | Runner image | `docker buildx bake` then `docker run --rm --entrypoint python <image> /usr/local/src/app/smoke_test.py` |
 | Agent Skills | `claude plugin validate .` |
 | Docs | `cd docs && npm install && npm run dev` |
+| Airflow provider | `cd airflow && uv sync && uv run pytest` (CI also runs it on Airflow 2.10 and 3 with their constraints) |
 
 CI runs the tests, lint, Terraform and runner image checks on every pull request; the docs are built and published from `main`.
 

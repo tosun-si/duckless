@@ -41,7 +41,7 @@ jobs:
             exit 1
           fi
           version="${TAG#v}"
-          for file in pyproject.toml runtime/pyproject.toml; do
+          for file in pyproject.toml runtime/pyproject.toml airflow/pyproject.toml; do
             declared=$(grep -m1 '^version = ' "$file" | cut -d'"' -f2)
             if [ "$declared" != "$version" ]; then
               echo "::error file=$file::version $declared does not match tag $TAG"
@@ -107,8 +107,30 @@ jobs:
       - run: uv build
       - uses: pypa/gh-action-pypi-publish@release/v1
 
-  github-release:
+  # After duckless: the provider depends on the version just published.
+  pypi-airflow:
     needs: [check-version, pypi]
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/airflow-provider-duckless/${{ needs.check-version.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write # PyPI Trusted Publishing, no API token
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+      - uses: astral-sh/setup-uv@v10.2.0 # no floating major tag upstream
+      # --no-sources: the dependency on duckless is the published package, not the repository path
+      - run: uv build airflow --no-sources -o dist-airflow
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-airflow/
+
+  github-release:
+    needs: [check-version, pypi, pypi-airflow]
     if: ${{ !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions:

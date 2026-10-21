@@ -1,0 +1,44 @@
+[project]
+name = "airflow-provider-duckless"
+version = "0.5.0"
+description = "Apache Airflow provider for DuckLess: run DuckDB jobs on Google Cloud from a DAG, deferrable"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+keywords = ["airflow", "duckdb", "duckless", "google-cloud", "cloud-composer", "data-engineering"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Apache Airflow",
+    "Framework :: Apache Airflow :: Provider",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "duckless>=0.5.0",
+    "apache-airflow>=2.10",
+]
+
+[project.urls]
+Homepage = "https://tosun-si.github.io/duckless/guides/airflow/"
+Documentation = "https://tosun-si.github.io/duckless/guides/airflow/"
+Repository = "https://github.com/tosun-si/duckless"
+Issues = "https://github.com/tosun-si/duckless/issues"
+
+# Airflow finds the provider (connections, extra links, its version in the UI) through this.
+[project.entry-points.apache_airflow_provider]
+provider_info = "duckless_airflow:get_provider_info"
+
+[dependency-groups]
+dev = ["pytest>=8.4"]
+
+[tool.uv.sources]
+duckless = { path = "..", editable = true }
+
+[tool.uv.build-backend]
+module-name = "duckless_airflow"
+
+[build-system]
+requires = ["uv_build>=0.8,<0.13"]
+build-backend = "uv_build"

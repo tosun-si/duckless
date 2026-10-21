@@ -18,3 +18,7 @@ docs/.astro/
 # IntelliJ / PyCharm project files
 .idea/
 *.iml
+
+# The Airflow provider is tested against Airflow constraints, not a lock
+airflow/uv.lock
+airflow/.venv/
