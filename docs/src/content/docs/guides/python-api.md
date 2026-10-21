@@ -9,7 +9,7 @@ terminal. It's how an orchestrator, a script or a notebook runs DuckLess jobs.
 ```python
 import duckless
 
-client = duckless.Client.from_env()   # the DUCKLESS_* settings, as the CLI reads them
+client = duckless.Client.from_env()  # the DUCKLESS_* settings, as the CLI reads them
 job = client.run("checks.py", machine="n2-highmem-8", spot=True, env={"DAY": "2026-10-20"})
 report = client.wait(job.job_id, check=True)
 
@@ -23,7 +23,9 @@ override them, and a mapping replaces the environment:
 
 ```python
 client = duckless.Client.from_env(project="my-project", region="europe-west1")
-client = duckless.Client.from_env({"DUCKLESS_PROJECT": "my-project", "DUCKLESS_BUCKET": "…", "DUCKLESS_SA": "…", "DUCKLESS_IMAGE": "…"})
+client = duckless.Client.from_env(
+    {"DUCKLESS_PROJECT": "my-project", "DUCKLESS_BUCKET": "…", "DUCKLESS_SA": "…", "DUCKLESS_IMAGE": "…"}
+)
 ```
 
 Nothing is called on Google Cloud until the first job: building the client is free. It uses the
